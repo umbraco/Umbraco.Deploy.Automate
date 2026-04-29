@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <Title>Umbraco Deploy Automate</Title>
+        <Description>Umbraco Deploy triggers and actions for Umbraco Automate</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Umbraco.Automate.Core" />
+        <PackageReference Include="Umbraco.Deploy.Core" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="Umbraco.Deploy.Automate.Tests.Unit" />
+    </ItemGroup>
+
+</Project>
