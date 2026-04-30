@@ -15,7 +15,7 @@ namespace Umbraco.Deploy.Automate.Triggers;
 [Trigger("umbracodeploy.validateArtifactImport", "Artifact Import Validation",
     Description = "Fires when a set of artifacts is being validated before import.",
     Group = "Deploy",
-    Icon = "icon-check-circle")]
+    Icon = "icon-shield")]
 public sealed class ValidateArtifactImportTrigger
     : NotificationTriggerBase<object, ValidateArtifactImportTriggerOutput, ValidateArtifactImportNotification>
 {

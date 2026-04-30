@@ -10,7 +10,7 @@ namespace Umbraco.Deploy.Automate.Triggers;
 [Trigger("umbracodeploy.diskTriggered", "Disk Deploy Completed",
     Description = "Fires when a disk-triggered deploy operation completes.",
     Group = "Deploy",
-    Icon = "icon-harddrive")]
+    Icon = "icon-hard-drive")]
 public sealed class DiskTriggeredTrigger
     : NotificationTriggerBase<object, DiskTriggeredTriggerOutput, DiskTriggeredNotification>
 {

@@ -10,7 +10,7 @@ namespace Umbraco.Deploy.Automate.Triggers;
 [Trigger("umbracodeploy.artifactImported", "Content Imported",
     Description = "Fires after a content artifact has been imported.",
     Group = "Deploy",
-    Icon = "icon-import")]
+    Icon = "icon-download")]
 public sealed class ArtifactImportedTrigger
     : NotificationTriggerBase<object, ArtifactImportedTriggerOutput, ArtifactImportedNotification>
 {
@@ -28,7 +28,7 @@ public sealed class ArtifactImportedTrigger
                 ArtifactUdi = artifact.Udi.ToString(),
                 ArtifactType = artifact.Udi.EntityType,
                 ArtifactAlias = artifact.Alias,
-                ArtifactName = artifact.Name,
+                ArtifactName = artifact.Name ?? string.Empty,
             },
         };
     }

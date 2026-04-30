@@ -10,7 +10,7 @@ namespace Umbraco.Deploy.Automate.Triggers;
 [Trigger("umbracodeploy.artifactExported", "Content Exported",
     Description = "Fires after a content artifact has been exported.",
     Group = "Deploy",
-    Icon = "icon-export")]
+    Icon = "icon-cloud-upload")]
 public sealed class ArtifactExportedTrigger
     : NotificationTriggerBase<object, ArtifactExportedTriggerOutput, ArtifactExportedNotification>
 {
@@ -28,7 +28,7 @@ public sealed class ArtifactExportedTrigger
                 ArtifactUdi = artifact.Udi.ToString(),
                 ArtifactType = artifact.Udi.EntityType,
                 ArtifactAlias = artifact.Alias,
-                ArtifactName = artifact.Name,
+                ArtifactName = artifact.Name ?? string.Empty,
             },
         };
     }
