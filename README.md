@@ -2,6 +2,8 @@
 
 Umbraco Deploy triggers for [Umbraco Automate](https://umbraco.com/products/umbraco-automate/), enabling automation flows based on deployment events.
 
+> **Built heavily with [Claude](https://claude.ai) (Anthropic)** — this package was designed and implemented with AI-assisted development as an experiment in how far you can take AI pair programming on a real Umbraco package.
+
 ## Overview
 
 This package exposes Umbraco Deploy notifications as Automate triggers, allowing you to build automation flows that react to deployment activity — content exports and imports, task completions and failures, disk operations, and more.
@@ -228,7 +230,27 @@ Umbraco Deploy notifications implement `INotification` (via `ObjectNotification<
 
 ## Requirements
 
-- Umbraco CMS 17.x
-- Umbraco Deploy 17.x
-- Umbraco Automate 0.1.x or later
-- .NET 10.0
+| Dependency | Version |
+|---|---|
+| .NET | 10 |
+| Umbraco CMS | 17.x |
+| Umbraco Deploy | 17.x |
+| Umbraco Automate | 0.1+ |
+
+---
+
+## Repository layout
+
+```
+src/
+  Umbraco.Deploy.Automate/         # Package source
+    Triggers/                      # Automate triggers
+    Triggers/Outputs/              # Trigger output types
+    DeployAutomateComposer.cs      # DI composition entry point (minimal — no bridge needed)
+tests/
+  Umbraco.Deploy.Automate.Tests.Unit/
+```
+
+---
+
+*This package was built heavily with [Claude](https://claude.ai) by Anthropic as part of an experiment in AI-assisted Umbraco package development. The architecture, implementation, tests, and documentation were all produced through an iterative conversation with Claude Code.*
