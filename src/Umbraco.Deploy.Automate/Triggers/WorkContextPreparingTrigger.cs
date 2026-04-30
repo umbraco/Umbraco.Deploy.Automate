@@ -7,7 +7,7 @@ namespace Umbraco.Deploy.Automate.Triggers;
 /// <summary>
 /// Fires when a deploy work context is being prepared before execution begins.
 /// </summary>
-[Trigger("umbracodeploy.workContextPreparing", "Deploy Work Context Preparing",
+[Trigger("umbracoDeploy.workContextPreparing", "Deploy Work Context Preparing",
     Description = "Fires when a deploy work context is being prepared before execution begins.",
     Group = "Deploy",
     Icon = "icon-settings")]
@@ -26,7 +26,7 @@ public sealed class WorkContextPreparingTrigger
             Output = new WorkContextPreparingTriggerOutput
             {
                 WorkItemId = workItem.Id,
-                WorkItemType = workItem.GetType().Name,
+                WorkItemType = workItem.GetType().ToString(),
                 OwnerName = workItem.OwnerName,
                 OwnerEmail = workItem.OwnerEmail,
                 EventTrigger = workItem.EventTrigger,

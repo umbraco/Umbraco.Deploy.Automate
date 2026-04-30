@@ -7,7 +7,7 @@ namespace Umbraco.Deploy.Automate.Triggers;
 /// <summary>
 /// Fires when a disk-triggered deploy operation completes.
 /// </summary>
-[Trigger("umbracodeploy.diskTriggered", "Disk Deploy Completed",
+[Trigger("umbracoDeploy.diskTriggered", "Disk Deploy Completed",
     Description = "Fires when a disk-triggered deploy operation completes.",
     Group = "Deploy",
     Icon = "icon-hard-drive")]

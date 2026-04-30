@@ -7,7 +7,7 @@ namespace Umbraco.Deploy.Automate.Triggers;
 /// <summary>
 /// Fires when a remote deploy operation completes.
 /// </summary>
-[Trigger("umbracodeploy.remoteCompleted", "Remote Deploy Completed",
+[Trigger("umbracoDeploy.remoteCompleted", "Remote Deploy Completed",
     Description = "Fires when a remote deploy operation completes.",
     Group = "Deploy",
     Icon = "icon-cloud")]

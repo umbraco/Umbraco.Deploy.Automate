@@ -7,7 +7,7 @@ namespace Umbraco.Deploy.Automate.Triggers;
 /// <summary>
 /// Fires after a content artifact has been imported.
 /// </summary>
-[Trigger("umbracodeploy.artifactImported", "Content Imported",
+[Trigger("umbracoDeploy.artifactImported", "Content Imported",
     Description = "Fires after a content artifact has been imported.",
     Group = "Deploy",
     Icon = "icon-download")]

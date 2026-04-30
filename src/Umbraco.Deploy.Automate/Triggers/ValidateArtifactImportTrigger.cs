@@ -12,7 +12,7 @@ namespace Umbraco.Deploy.Automate.Triggers;
 /// but these advanced features are not available through the Automate trigger system.
 /// This trigger is for observation only.
 /// </remarks>
-[Trigger("umbracodeploy.validateArtifactImport", "Artifact Import Validation",
+[Trigger("umbracoDeploy.validateArtifactImport", "Artifact Import Validation",
     Description = "Fires when a set of artifacts is being validated before import.",
     Group = "Deploy",
     Icon = "icon-shield")]

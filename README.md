@@ -26,10 +26,10 @@ The `DeployAutomateComposer` is auto-discovered by Umbraco's composition system.
 
 | Trigger | Alias | Description |
 |---------|-------|-------------|
-| `TaskCompletedTrigger` | `umbracodeploy.taskCompleted` | Fires when a deployment task completes successfully |
-| `TaskFailedTrigger` | `umbracodeploy.taskFailed` | Fires when a deployment task fails |
-| `ArtifactExportedTrigger` | `umbracodeploy.artifactExported` | Fires after a content artifact is exported |
-| `ArtifactImportedTrigger` | `umbracodeploy.artifactImported` | Fires after a content artifact is imported |
+| `TaskCompletedTrigger` | `umbracoDeploy.taskCompleted` | Fires when a deployment task completes successfully |
+| `TaskFailedTrigger` | `umbracoDeploy.taskFailed` | Fires when a deployment task fails |
+| `ArtifactExportedTrigger` | `umbracoDeploy.artifactExported` | Fires after a content artifact is exported |
+| `ArtifactImportedTrigger` | `umbracoDeploy.artifactImported` | Fires after a content artifact is imported |
 
 > **Note on Deployment Started:** Umbraco Deploy does not publish a dedicated "task started" notification. `TaskNotification` is the base class only; the pipeline publishes `TaskCompletedNotification` or `TaskFailedNotification` as the terminal events. Use `WorkContextPreparingTrigger` (Advanced) as the closest equivalent to a "deployment starting" signal.
 
@@ -74,10 +74,10 @@ The `DeployAutomateComposer` is auto-discovered by Umbraco's composition system.
 
 | Trigger | Alias | Description |
 |---------|-------|-------------|
-| `FilesWrittenTrigger` | `umbracodeploy.filesWritten` | Fires when content files are written to disk |
-| `FilesDeletedTrigger` | `umbracodeploy.filesDeleted` | Fires when content files are deleted from disk |
-| `RemoteCompletedTrigger` | `umbracodeploy.remoteCompleted` | Fires when a remote deploy operation completes |
-| `DiskTriggeredTrigger` | `umbracodeploy.diskTriggered` | Fires when a disk-triggered deploy completes |
+| `FilesWrittenTrigger` | `umbracoDeploy.filesWritten` | Fires when content files are written to disk |
+| `FilesDeletedTrigger` | `umbracoDeploy.filesDeleted` | Fires when content files are deleted from disk |
+| `RemoteCompletedTrigger` | `umbracoDeploy.remoteCompleted` | Fires when a remote deploy operation completes |
+| `DiskTriggeredTrigger` | `umbracoDeploy.diskTriggered` | Fires when a disk-triggered deploy completes |
 
 #### FilesWrittenTrigger / FilesDeletedTrigger / UserUpdatedTrigger Output
 
@@ -111,11 +111,11 @@ The `DeployAutomateComposer` is auto-discovered by Umbraco's composition system.
 
 | Trigger | Alias | Description |
 |---------|-------|-------------|
-| `ArtifactExportingTrigger` | `umbracodeploy.artifactExporting` | Fires before an artifact is exported (pre-export) |
-| `ArtifactImportingTrigger` | `umbracodeploy.artifactImporting` | Fires before an artifact is imported (pre-import) |
-| `ValidateArtifactImportTrigger` | `umbracodeploy.validateArtifactImport` | Fires when artifacts are being validated before import |
-| `UserUpdatedTrigger` | `umbracodeploy.userUpdated` | Fires when user-related deploy files are updated |
-| `WorkContextPreparingTrigger` | `umbracodeploy.workContextPreparing` | Fires when a deploy work context is being prepared |
+| `ArtifactExportingTrigger` | `umbracoDeploy.artifactExporting` | Fires before an artifact is exported (pre-export) |
+| `ArtifactImportingTrigger` | `umbracoDeploy.artifactImporting` | Fires before an artifact is imported (pre-import) |
+| `ValidateArtifactImportTrigger` | `umbracoDeploy.validateArtifactImport` | Fires when artifacts are being validated before import |
+| `UserUpdatedTrigger` | `umbracoDeploy.userUpdated` | Fires when user-related deploy files are updated |
+| `WorkContextPreparingTrigger` | `umbracoDeploy.workContextPreparing` | Fires when a deploy work context is being prepared |
 
 > **Cancelable notifications:** `ArtifactExportingTrigger`, `ArtifactImportingTrigger`, and `ValidateArtifactImportTrigger` are backed by cancelable Deploy notifications. However, cancellation is not available through the Automate trigger system — these triggers fire for observation only.
 
@@ -147,7 +147,7 @@ Same properties as the post-export/import triggers (`ArtifactUdi`, `ArtifactType
 ### Notify team on deployment failure
 
 ```
-Trigger: Deployment Failed (umbracodeploy.taskFailed)
+Trigger: Deployment Failed (umbracoDeploy.taskFailed)
   → Condition: ExceptionType is not empty
   → Action: Send Slack message to #deployments
              "Deployment failed for {OwnerEmail}: {ExceptionMessage}"
@@ -156,7 +156,7 @@ Trigger: Deployment Failed (umbracodeploy.taskFailed)
 ### Log every imported document
 
 ```
-Trigger: Content Imported (umbracodeploy.artifactImported)
+Trigger: Content Imported (umbracoDeploy.artifactImported)
   → Condition: ArtifactType == "document"
   → Action: Write to log
              "Imported document '{ArtifactName}' ({ArtifactUdi})"
@@ -165,7 +165,7 @@ Trigger: Content Imported (umbracodeploy.artifactImported)
 ### Alert on disk deploy completion
 
 ```
-Trigger: Disk Deploy Completed (umbracodeploy.diskTriggered)
+Trigger: Disk Deploy Completed (umbracoDeploy.diskTriggered)
   → Condition: Result != "Succeeded"
   → Action: Send email to operations team
 ```
@@ -173,7 +173,7 @@ Trigger: Disk Deploy Completed (umbracodeploy.diskTriggered)
 ### React when a specific content type is deployed
 
 ```
-Trigger: Content Imported (umbracodeploy.artifactImported)
+Trigger: Content Imported (umbracoDeploy.artifactImported)
   → Condition: ArtifactAlias starts with "news"
   → Action: Trigger cache invalidation
 ```
@@ -181,7 +181,7 @@ Trigger: Content Imported (umbracodeploy.artifactImported)
 ### Monitor deployment duration
 
 ```
-Trigger: Deployment Succeeded (umbracodeploy.taskCompleted)
+Trigger: Deployment Succeeded (umbracoDeploy.taskCompleted)
   → Condition: Duration > 60
   → Action: Log performance warning
              "Long deployment by {OwnerEmail}: {Duration}s, processed {ProcessCount} items"

@@ -7,7 +7,7 @@ namespace Umbraco.Deploy.Automate.Triggers;
 /// <summary>
 /// Fires when content files are deleted from disk.
 /// </summary>
-[Trigger("umbracodeploy.filesDeleted", "Files Deleted from Disk",
+[Trigger("umbracoDeploy.filesDeleted", "Files Deleted from Disk",
     Description = "Fires when content files are deleted from disk.",
     Group = "Deploy",
     Icon = "icon-trash")]

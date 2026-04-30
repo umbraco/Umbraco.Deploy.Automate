@@ -7,7 +7,7 @@ namespace Umbraco.Deploy.Automate.Triggers;
 /// <summary>
 /// Fires after a content artifact has been exported.
 /// </summary>
-[Trigger("umbracodeploy.artifactExported", "Content Exported",
+[Trigger("umbracoDeploy.artifactExported", "Content Exported",
     Description = "Fires after a content artifact has been exported.",
     Group = "Deploy",
     Icon = "icon-cloud-upload")]
