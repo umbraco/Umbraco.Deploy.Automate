@@ -45,7 +45,7 @@ public class ValidateArtifactImportTriggerTests
 
         var output = ((TriggerEvent<ValidateArtifactImportTriggerOutput>)events[0]).Output;
         output.ArtifactUdis.Count().ShouldBe(2);
-        output.ArtifactUdis.ShouldAllBe(u => u.StartsWith("udi://document/"));
+        output.ArtifactUdis.ShouldAllBe(u => u.StartsWith("umb://document/"));
     }
 
     private static ValidateArtifactImportNotification BuildNotification(int artifactCount)

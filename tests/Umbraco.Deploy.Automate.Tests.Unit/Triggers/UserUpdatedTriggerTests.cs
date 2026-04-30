@@ -40,7 +40,7 @@ public class UserUpdatedTriggerTests
     private static UserUpdatedNotification BuildNotification(string email, string name, int fileCount)
     {
         var files = Enumerable.Range(0, fileCount)
-            .Select(_ => Mock.Of<DiskFileReference>())
+            .Select(i => new DiskFileReference($"user{i}", "user", [$"/path/user{i}.json"]))
             .ToList();
         return new UserUpdatedNotification(files, email, name, new EventMessages());
     }

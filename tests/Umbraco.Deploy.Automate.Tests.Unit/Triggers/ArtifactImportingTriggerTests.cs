@@ -17,7 +17,7 @@ public class ArtifactImportingTriggerTests
     [Fact]
     public void MapEvent_ReturnsCorrectAlias()
     {
-        var notification = BuildNotification("document", "blog", "Blog");
+        var notification = BuildNotification("document");
 
         var events = _trigger.MapEvent(notification).ToList();
 
@@ -26,25 +26,33 @@ public class ArtifactImportingTriggerTests
     }
 
     [Fact]
-    public void MapEvent_MapsArtifactSignatureProperties()
+    public void MapEvent_MapsArtifactUdiAndType()
     {
-        var notification = BuildNotification("document", "blog", "Blog");
+        var notification = BuildNotification("document");
 
         var events = _trigger.MapEvent(notification).ToList();
 
         var output = ((TriggerEvent<ArtifactImportingTriggerOutput>)events[0]).Output;
         output.ArtifactType.ShouldBe("document");
-        output.ArtifactAlias.ShouldBe("blog");
-        output.ArtifactName.ShouldBe("Blog");
+        output.ArtifactUdi.ShouldStartWith("umb://document/");
     }
 
-    private static ArtifactImportingNotification BuildNotification(string entityType, string alias, string name)
+    [Fact]
+    public void MapEvent_MapsMediaArtifactType()
+    {
+        var notification = BuildNotification("media");
+
+        var events = _trigger.MapEvent(notification).ToList();
+
+        var output = ((TriggerEvent<ArtifactImportingTriggerOutput>)events[0]).Output;
+        output.ArtifactType.ShouldBe("media");
+    }
+
+    private static ArtifactImportingNotification BuildNotification(string entityType)
     {
         var udi = new GuidUdi(entityType, Guid.NewGuid());
         var artifact = new Mock<IArtifactSignature>();
         artifact.Setup(x => x.Udi).Returns(udi);
-        artifact.Setup(x => x.Alias).Returns(alias);
-        artifact.Setup(x => x.Name).Returns(name);
         return new ArtifactImportingNotification(artifact.Object, new EventMessages());
     }
 }

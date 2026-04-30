@@ -50,7 +50,7 @@ public class FilesWrittenTriggerTests
     private static FilesWrittenNotification BuildNotification(string email, string name, int fileCount)
     {
         var files = Enumerable.Range(0, fileCount)
-            .Select(_ => Mock.Of<DiskFileReference>())
+            .Select(i => new DiskFileReference($"file{i}", "content", [$"/path/file{i}.cs"]))
             .ToList();
         return new FilesWrittenNotification(files, email, name, new EventMessages());
     }
