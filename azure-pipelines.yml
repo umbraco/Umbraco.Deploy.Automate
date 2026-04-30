@@ -119,3 +119,34 @@ stages:
               searchFolder: $(Build.ArtifactStagingDirectory)/tests
               testRunTitle: Unit Tests - $(Agent.OS)
               configuration: $(buildConfiguration)
+
+  - stage: Publish
+    displayName: Publish to NuGet.org
+    dependsOn: Test
+    condition: |
+      and(
+        succeeded(),
+        or(
+          eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+          startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')
+        )
+      )
+    jobs:
+      - job: Publish
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: DownloadPipelineArtifact@2
+            displayName: Download NuGet packages
+            inputs:
+              artifact: nupkg
+              path: $(Build.ArtifactStagingDirectory)/nupkg
+
+          - task: NuGetCommand@2
+            displayName: Push to NuGet.org
+            inputs:
+              command: push
+              packagesToPush: $(Build.ArtifactStagingDirectory)/nupkg/*.nupkg
+              nuGetFeedType: external
+              publishFeedCredentials: 'NuGet-Umbraco'
+              allowPackageConflicts: true
