@@ -1,0 +1,150 @@
+name: $(TeamProject)_$(Build.DefinitionName)_$(SourceBranchName)_$(Date:yyyyMMdd)$(Rev:.r)
+
+trigger:
+  branches:
+    include:
+    - '*'
+  tags:
+    include:
+    - release-*
+
+parameters:
+  - name: cache_nuget
+    displayName: Cache NuGet packages
+    type: boolean
+    default: true
+
+variables:
+  solution: Umbraco.Deploy.Automate.slnx
+  buildConfiguration: Release
+  DOTNET_NOLOGO: true
+  DOTNET_GENERATE_ASPNET_CERTIFICATE: false
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+stages:
+  - stage: Build
+    variables:
+      NUGET_PACKAGES: $(Pipeline.Workspace)/.nuget/packages
+    jobs:
+      - job: Build
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+            fetchDepth: 0
+
+          - task: NuGetAuthenticate@1
+            displayName: Authenticate NuGet
+
+          - task: UseDotNet@2
+            displayName: Use .NET SDK from global.json
+            inputs:
+              useGlobalJson: true
+
+          - ${{ if parameters.cache_nuget }}:
+            - task: Cache@2
+              displayName: Cache NuGet packages
+              inputs:
+                key: 'nuget | "$(Agent.OS)" | Directory.Packages.props'
+                restoreKeys: |
+                  nuget | "$(Agent.OS)"
+                path: $(NUGET_PACKAGES)
+
+          - script: dotnet restore $(solution)
+            displayName: Restore NuGet packages
+
+          - script: dotnet tool install --global nbgv || true
+            displayName: Install NBGV
+
+          - script: nbgv cloud
+            displayName: Set version
+
+          - script: dotnet build $(solution) --configuration $(buildConfiguration) --no-restore -p:ContinuousIntegrationBuild=true -p:DisableCloudBuildNumber=true
+            displayName: Run dotnet build
+
+          - script: dotnet pack $(solution) --configuration $(buildConfiguration) --no-build --output $(Build.ArtifactStagingDirectory)/nupkg -p:DisableCloudBuildNumber=true
+            displayName: Run dotnet pack
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publish NuGet packages
+            inputs:
+              targetPath: $(Build.ArtifactStagingDirectory)/nupkg
+              artifactName: nupkg
+
+          - task: PublishPipelineArtifact@1
+            displayName: Publish build output
+            inputs:
+              targetPath: $(Build.SourcesDirectory)
+              artifactName: build_output
+
+  - stage: Test
+    dependsOn: Build
+    jobs:
+      - job: UnitTests
+        displayName: Unit Tests
+        strategy:
+          matrix:
+            Windows:
+              vmImage: 'windows-latest'
+            Linux:
+              vmImage: 'ubuntu-latest'
+            macOS:
+              vmImage: 'macos-latest'
+        pool:
+          vmImage: $(vmImage)
+        steps:
+          - task: DownloadPipelineArtifact@2
+            displayName: Download build artifacts
+            inputs:
+              artifact: build_output
+              path: $(Build.SourcesDirectory)
+
+          - task: UseDotNet@2
+            displayName: Use .NET SDK from global.json
+            inputs:
+              useGlobalJson: true
+
+          - script: dotnet test $(solution) --configuration $(buildConfiguration) --no-build --logger trx --results-directory $(Build.ArtifactStagingDirectory)/tests
+            displayName: Run dotnet test
+
+          - task: PublishTestResults@2
+            displayName: Publish test results
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: VSTest
+              testResultsFiles: '*.trx'
+              searchFolder: $(Build.ArtifactStagingDirectory)/tests
+              testRunTitle: Unit Tests - $(Agent.OS)
+              configuration: $(buildConfiguration)
+
+  - stage: Publish
+    displayName: Publish to NuGet.org
+    dependsOn: Test
+    condition: |
+      and(
+        succeeded(),
+        or(
+          eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+          startsWith(variables['Build.SourceBranch'], 'refs/tags/release-')
+        )
+      )
+    jobs:
+      - job: Publish
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: DownloadPipelineArtifact@2
+            displayName: Download NuGet packages
+            inputs:
+              artifact: nupkg
+              path: $(Build.ArtifactStagingDirectory)/nupkg
+
+          - task: NuGetCommand@2
+            displayName: Push to NuGet.org
+            inputs:
+              command: push
+              packagesToPush: $(Build.ArtifactStagingDirectory)/nupkg/*.nupkg
+              nuGetFeedType: external
+              publishFeedCredentials: 'NuGet-Umbraco'
+              allowPackageConflicts: true

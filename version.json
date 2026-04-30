@@ -1,19 +1,23 @@
 {
-  "$schema": "https://raw.githubusercontent.com/dotnet/Nerdbank.GitVersioning/master/src/NerdBank.GitVersioning/version.schema.json",
-  "version": "17.0",
+  "$schema": "https://raw.githubusercontent.com/dotnet/Nerdbank.GitVersioning/main/src/NerdBank.GitVersioning/version.schema.json",
+  "version": "0.1.0",
   "assemblyVersion": {
-    "precision": "minor"
+    "precision": "build"
   },
+  "gitCommitIdShortFixedLength": 7,
   "nuGetPackageVersion": {
-    "semVer": 2
+    "semVer": 2.0
   },
   "publicReleaseRefSpec": [
-    "^refs/heads/main$",
-    "^refs/tags/v\\d+\\.\\d+"
+    "^refs/tags/release-"
   ],
   "cloudBuild": {
     "buildNumber": {
-      "enabled": true
+      "enabled": false
     }
+  },
+  "release": {
+    "tagName": "release-{version}",
+    "branchName": "release/{version}"
   }
 }
