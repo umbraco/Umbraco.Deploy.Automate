@@ -3,10 +3,11 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
 
-  <!-- Versioning -->
+  <!-- Versioning + build-time tooling -->
   <ItemGroup>
     <GlobalPackageReference Include="Nerdbank.GitVersioning" Version="3.8.118" />
     <GlobalPackageReference Include="Umbraco.GitVersioning.Extensions" Version="0.2.0" />
+    <GlobalPackageReference Include="Umbraco.JsonSchema.Extensions" Version="0.4.0" PrivateAssets="all" />
   </ItemGroup>
 
   <!-- Umbraco Automate -->
@@ -19,6 +20,7 @@
   <!-- Umbraco Deploy -->
   <ItemGroup>
     <PackageVersion Include="Umbraco.Deploy.Core" Version="[17.0.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Deploy.Infrastructure" Version="[17.0.0, 17.999.999)" />
   </ItemGroup>
 
   <!-- Test dependencies -->
