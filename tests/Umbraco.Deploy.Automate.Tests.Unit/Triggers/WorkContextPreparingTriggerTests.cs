@@ -43,7 +43,7 @@ public class WorkContextPreparingTriggerTests
 
         var output = ((TriggerEvent<WorkContextPreparingTriggerOutput>)events[0]).Output;
         output.WorkItemId.ShouldBe(workItemId);
-        output.WorkItemType.ShouldBe(workItem.Object.GetType().ToString());
+        output.WorkItemType.ShouldBe(workItem.Object.GetType().FullName);
         output.OwnerName.ShouldBe("Automation User");
         output.OwnerEmail.ShouldBe("auto@example.com");
         output.EventTrigger.ShouldBe("scheduled");

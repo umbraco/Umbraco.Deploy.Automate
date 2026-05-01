@@ -26,7 +26,7 @@ public sealed class WorkContextPreparingTrigger
             Output = new WorkContextPreparingTriggerOutput
             {
                 WorkItemId = workItem.Id,
-                WorkItemType = workItem.GetType().ToString(),
+                WorkItemType = workItem.GetType().FullName!,
                 OwnerName = workItem.OwnerName,
                 OwnerEmail = workItem.OwnerEmail,
                 EventTrigger = workItem.EventTrigger,
