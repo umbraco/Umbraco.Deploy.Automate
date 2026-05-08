@@ -11,7 +11,7 @@ namespace Umbraco.Deploy.Automate.Triggers;
 /// The underlying Deploy notification is cancelable, but cancellation is not supported
 /// through the Automate trigger system. This trigger is for observation only.
 /// </remarks>
-[Trigger("umbracodeploy.artifactImporting", "Content Importing",
+[Trigger("umbracoDeploy.artifactImporting", "Content Importing",
     Description = "Fires before a content artifact is imported.",
     Group = "Deploy",
     Icon = "icon-download")]

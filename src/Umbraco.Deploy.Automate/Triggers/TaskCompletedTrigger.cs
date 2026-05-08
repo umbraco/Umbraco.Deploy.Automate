@@ -7,7 +7,7 @@ namespace Umbraco.Deploy.Automate.Triggers;
 /// <summary>
 /// Fires when a deployment task completes successfully.
 /// </summary>
-[Trigger("umbracodeploy.taskCompleted", "Deployment Succeeded",
+[Trigger("umbracoDeploy.taskCompleted", "Deployment Succeeded",
     Description = "Fires when a deployment task completes successfully.",
     Group = "Deploy",
     Icon = "icon-check")]

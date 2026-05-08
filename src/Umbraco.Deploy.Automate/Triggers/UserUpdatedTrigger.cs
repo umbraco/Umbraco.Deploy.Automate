@@ -7,7 +7,7 @@ namespace Umbraco.Deploy.Automate.Triggers;
 /// <summary>
 /// Fires when user-related deploy files are updated on disk.
 /// </summary>
-[Trigger("umbracodeploy.userUpdated", "User Files Updated",
+[Trigger("umbracoDeploy.userUpdated", "User Files Updated",
     Description = "Fires when user-related deploy files are updated on disk.",
     Group = "Deploy",
     Icon = "icon-user")]

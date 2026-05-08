@@ -28,6 +28,8 @@ stages:
       NUGET_PACKAGES: $(Pipeline.Workspace)/.nuget/packages
     jobs:
       - job: Build
+        variables:
+        - group: dependency-track
         pool:
           vmImage: ubuntu-latest
         steps:

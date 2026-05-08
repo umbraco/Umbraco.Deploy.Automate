@@ -20,7 +20,7 @@ public class DiskTriggeredTriggerTests
         var events = _trigger.MapEvent(notification).ToList();
 
         events.ShouldHaveSingleItem();
-        events[0].TriggerAlias.ShouldBe("umbracodeploy.diskTriggered");
+        events[0].TriggerAlias.ShouldBe("umbracoDeploy.diskTriggered");
     }
 
     [Fact]
@@ -32,7 +32,7 @@ public class DiskTriggeredTriggerTests
 
         var output = ((TriggerEvent<DiskTriggeredTriggerOutput>)events[0]).Output;
         output.Result.ShouldBe("Succeeded");
-        output.ExceptionType.ShouldBeEmpty();
+        output.ExceptionType.ShouldBeNullOrEmpty();
     }
 
     [Fact]

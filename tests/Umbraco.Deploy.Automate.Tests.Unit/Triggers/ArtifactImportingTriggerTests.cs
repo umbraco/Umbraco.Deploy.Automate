@@ -22,7 +22,7 @@ public class ArtifactImportingTriggerTests
         var events = _trigger.MapEvent(notification).ToList();
 
         events.ShouldHaveSingleItem();
-        events[0].TriggerAlias.ShouldBe("umbracodeploy.artifactImporting");
+        events[0].TriggerAlias.ShouldBe("umbracoDeploy.artifactImporting");
     }
 
     [Fact]

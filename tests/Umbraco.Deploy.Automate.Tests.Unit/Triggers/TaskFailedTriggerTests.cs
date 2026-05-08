@@ -21,7 +21,7 @@ public class TaskFailedTriggerTests
         var events = _trigger.MapEvent(notification).ToList();
 
         events.ShouldHaveSingleItem();
-        events[0].TriggerAlias.ShouldBe("umbracodeploy.taskFailed");
+        events[0].TriggerAlias.ShouldBe("umbracoDeploy.taskFailed");
     }
 
     [Fact]

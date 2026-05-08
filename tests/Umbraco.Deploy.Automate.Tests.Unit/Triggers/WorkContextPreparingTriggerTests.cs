@@ -21,7 +21,7 @@ public class WorkContextPreparingTriggerTests
         var events = _trigger.MapEvent(notification).ToList();
 
         events.ShouldHaveSingleItem();
-        events[0].TriggerAlias.ShouldBe("umbracodeploy.workContextPreparing");
+        events[0].TriggerAlias.ShouldBe("umbracoDeploy.workContextPreparing");
     }
 
     [Fact]
@@ -43,6 +43,7 @@ public class WorkContextPreparingTriggerTests
 
         var output = ((TriggerEvent<WorkContextPreparingTriggerOutput>)events[0]).Output;
         output.WorkItemId.ShouldBe(workItemId);
+        output.WorkItemType.ShouldBe(workItem.Object.GetType().FullName);
         output.OwnerName.ShouldBe("Automation User");
         output.OwnerEmail.ShouldBe("auto@example.com");
         output.EventTrigger.ShouldBe("scheduled");

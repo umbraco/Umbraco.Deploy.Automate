@@ -7,7 +7,7 @@ namespace Umbraco.Deploy.Automate.Triggers;
 /// <summary>
 /// Fires when content files are written to disk.
 /// </summary>
-[Trigger("umbracodeploy.filesWritten", "Files Written to Disk",
+[Trigger("umbracoDeploy.filesWritten", "Files Written to Disk",
     Description = "Fires when content files are written to disk.",
     Group = "Deploy",
     Icon = "icon-document")]

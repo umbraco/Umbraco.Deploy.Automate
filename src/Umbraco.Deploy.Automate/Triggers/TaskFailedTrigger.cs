@@ -7,7 +7,7 @@ namespace Umbraco.Deploy.Automate.Triggers;
 /// <summary>
 /// Fires when a deployment task fails.
 /// </summary>
-[Trigger("umbracodeploy.taskFailed", "Deployment Failed",
+[Trigger("umbracoDeploy.taskFailed", "Deployment Failed",
     Description = "Fires when a deployment task fails.",
     Group = "Deploy",
     Icon = "icon-alert")]

@@ -22,7 +22,7 @@ public class ArtifactExportingTriggerTests
         var events = _trigger.MapEvent(notification).ToList();
 
         events.ShouldHaveSingleItem();
-        events[0].TriggerAlias.ShouldBe("umbracodeploy.artifactExporting");
+        events[0].TriggerAlias.ShouldBe("umbracoDeploy.artifactExporting");
     }
 
     [Fact]
