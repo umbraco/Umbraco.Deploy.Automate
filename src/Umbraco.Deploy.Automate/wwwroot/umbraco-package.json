@@ -1,0 +1,13 @@
+{
+  "name": "Umbraco Deploy Automate",
+  "id": "Umbraco.Deploy.Automate",
+  "version": "",
+  "extensions": [
+    {
+      "name": "Umbraco Deploy Automate EntryPoint",
+      "alias": "Umb.DeployAutomate.EntryPoint",
+      "type": "backofficeEntryPoint",
+      "js": "/App_Plugins/Umbraco.Deploy.Automate/umbraco-deploy-automate.js"
+    }
+  ]
+}

@@ -1,17 +1,104 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
 
     <PropertyGroup>
         <Title>Umbraco Deploy Automate</Title>
-        <Description>Umbraco Deploy triggers and actions for Umbraco Automate</Description>
+        <Description>Umbraco Deploy support for Umbraco Automate (artifacts, service connectors, triggers and actions).</Description>
+        <StaticWebAssetBasePath>App_Plugins/Umbraco.Deploy.Automate</StaticWebAssetBasePath>
+        <EnableDefaultContentItems>false</EnableDefaultContentItems>
+        <!-- Disable compression for static files, because MapStaticAssets() is not used anyway (yet) -->
+        <CompressionEnabled>false</CompressionEnabled>
     </PropertyGroup>
 
     <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+        <SupportedPlatform Include="browser" />
+    </ItemGroup>
+
+    <!-- Use project references for local dev (when the Umbraco.Automate repo is cloned alongside this one),
+         NuGet packages for CI. Set UseProjectReferences=false in CI or pass /p:UseProjectReferences=false. -->
+    <PropertyGroup>
+        <UseProjectReferences Condition="'$(UseProjectReferences)' == ''">true</UseProjectReferences>
+        <_AutomateCoreProjectPath>..\..\..\Umbraco.Automate\Umbraco.Automate\src\Umbraco.Automate.Core\Umbraco.Automate.Core.csproj</_AutomateCoreProjectPath>
+    </PropertyGroup>
+
+    <ItemGroup Condition="'$(UseProjectReferences)' == 'true' And Exists('$(_AutomateCoreProjectPath)')">
+        <ProjectReference Include="$(_AutomateCoreProjectPath)" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(UseProjectReferences)' != 'true' Or !Exists('$(_AutomateCoreProjectPath)')">
         <PackageReference Include="Umbraco.Automate.Core" />
-        <PackageReference Include="Umbraco.Deploy.Core" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Umbraco.Deploy.Infrastructure" />
     </ItemGroup>
 
     <ItemGroup>
         <InternalsVisibleTo Include="Umbraco.Deploy.Automate.Tests.Unit" />
     </ItemGroup>
+
+    <!-- Add JSON schema file to package output -->
+    <PropertyGroup>
+        <_DeployAutomateJsonSchemaReference>appsettings-schema.Umbraco.Deploy.Automate.json</_DeployAutomateJsonSchemaReference>
+    </PropertyGroup>
+    <ItemGroup>
+        <Content Include="$(_DeployAutomateJsonSchemaReference)" PackagePath="" Visible="false" />
+    </ItemGroup>
+
+    <!-- Generate JSON schema on build (and before copying to project) -->
+    <Target Name="GenerateAppsettingsSchema" BeforeTargets="Build;CopyUmbracoJsonSchemaFiles" Inputs="$(TargetPath)" Outputs="$(_DeployAutomateJsonSchemaReference)">
+        <Message Text="Generating $(_DeployAutomateJsonSchemaReference)" Importance="high" />
+        <JsonSchemaGenerate AssemblyPath="$(TargetPath)" TypeName="DeployAutomateSchema" OutputPath="$(_DeployAutomateJsonSchemaReference)" IncludeObsoleteProperties="false" />
+        <ItemGroup>
+            <FileWrites Include="$(_DeployAutomateJsonSchemaReference)" />
+        </ItemGroup>
+    </Target>
+
+    <!-- Copy client assets to intermediate output path (mirrors Umbraco.Forms.Deploy) -->
+    <ItemGroup>
+        <ClientAssetsInputs Include="wwwroot\**" Exclude="$(DefaultItemExcludes)" />
+    </ItemGroup>
+
+    <Target Name="ClientAssetsBuild" BeforeTargets="DispatchToInnerBuilds;AssignTargetPaths" Inputs="@(ClientAssetsInputs)" Outputs="$(IntermediateOutputPath)clientassetsbuild.complete.txt">
+        <PropertyGroup>
+            <_ClientAssetsOutputFullPath>$([System.IO.Path]::GetFullPath('$(IntermediateOutputPath)clientassets'))</_ClientAssetsOutputFullPath>
+        </PropertyGroup>
+
+        <Message Text="Copying client assets" Importance="High" />
+
+        <MakeDir Directories="$(_ClientAssetsOutputFullPath)" />
+        <Copy SourceFiles="%(ClientAssetsInputs.FullPath)" DestinationFolder="$(_ClientAssetsOutputFullPath)" />
+
+        <ItemGroup>
+            <_ClientAssetsBuildOutput Include="$(IntermediateOutputPath)clientassets\**"></_ClientAssetsBuildOutput>
+        </ItemGroup>
+
+        <WriteLinesToFile File="$(IntermediateOutputPath)clientassetsbuild.complete.txt" Lines="@(_ClientAssetsBuildOutput)" />
+    </Target>
+
+    <Target Name="DefineClientAssets" AfterTargets="ClientAssetsBuild" DependsOnTargets="ResolveStaticWebAssetsConfiguration">
+        <ItemGroup>
+            <FileWrites Include="@(_ClientAssetsBuildOutput)" />
+            <FileWrites Include="$(IntermediateOutputPath)clientassetsbuild.complete.txt" />
+        </ItemGroup>
+
+        <DefineStaticWebAssets CandidateAssets="@(_ClientAssetsBuildOutput)" SourceId="$(PackageId)" SourceType="Computed" ContentRoot="$(_ClientAssetsOutputFullPath)" BasePath="$(StaticWebAssetBasePath)">
+            <Output TaskParameter="Assets" ItemName="StaticWebAsset" />
+        </DefineStaticWebAssets>
+        <DefineStaticWebAssetEndpoints CandidateAssets="@(StaticWebAsset)" ExistingEndpoints="@(StaticWebAssetEndpoint)" ContentTypeMappings="@(StaticWebAssetContentTypeMapping)">
+            <Output TaskParameter="Endpoints" ItemName="_ClientStaticWebAssetEndpoint" />
+        </DefineStaticWebAssetEndpoints>
+        <ItemGroup>
+            <StaticWebAssetEndpoint Include="@(_ClientStaticWebAssetEndpoint)" />
+        </ItemGroup>
+    </Target>
+
+    <!-- Update umbraco-package.json files with current build version after client assets build -->
+    <Target Name="UpdatePackageManifestVersion" DependsOnTargets="ClientAssetsBuild" AfterTargets="GetUmbracoBuildVersion">
+        <ItemGroup>
+            <_PackageManifestFiles Include="$(IntermediateOutputPath)clientassets\**\umbraco-package.json" />
+        </ItemGroup>
+        <JsonPathUpdateValue JsonFile="%(_PackageManifestFiles.FullPath)" Path="$.version" Value="&quot;$(PackageVersion)&quot;" />
+    </Target>
 
 </Project>

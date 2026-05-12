@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <PackageReference Include="Umbraco.Automate.Testing" />
+    <PackageReference Include="Umbraco.Deploy.Infrastructure" />
   </ItemGroup>
 
   <ItemGroup>
