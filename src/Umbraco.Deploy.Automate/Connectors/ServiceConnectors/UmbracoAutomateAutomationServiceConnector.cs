@@ -3,6 +3,7 @@ using System.Text.Json;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Automations.Transfer;
+using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Cms.Core;
@@ -22,6 +23,7 @@ public class UmbracoAutomateAutomationServiceConnector(
     IAutomationService automationService,
     IWorkspaceService workspaceService,
     ActionCollection actionCollection,
+    ControlFlowCollection controlFlowCollection,
     TriggerCollection triggerCollection,
     ISensitiveSettingsStripper sensitiveStripper,
     DeployAutomateSettingsAccessor settingsAccessor)
@@ -193,11 +195,15 @@ public class UmbracoAutomateAutomationServiceConnector(
 
         foreach (var step in steps)
         {
-            if (actionCollection.GetByAlias(step.ActionAlias) is null)
+            // Steps can be backed by either an Action (e.g. http request) or a ControlFlow
+            // (e.g. forEach, condition). Both contribute step types via DI; the matching
+            // alias must exist in one of the two collections on the target.
+            if (actionCollection.GetByAlias(step.ActionAlias) is null
+                && controlFlowCollection.GetByAlias(step.ActionAlias) is null)
             {
                 throw new InvalidOperationException(
-                    $"Target site does not contain an action with alias '{step.ActionAlias}' (automation '{artifact.Name}', step '{step.Name}'). " +
-                    "Ensure the package providing this action is installed on the target.");
+                    $"Target site does not contain an action or control flow with alias '{step.ActionAlias}' (automation '{artifact.Name}', step '{step.Name}'). " +
+                    "Ensure the package providing this step type is installed on the target.");
             }
         }
 
