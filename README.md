@@ -62,9 +62,10 @@ Process passes are ordered to honour the graph: Connections (pass 2) → Workspa
 All user-facing settings round-trip with two intentional exceptions:
 
 - **`Automation.Status` and `Automation.PublishedVersion`** are not overwritten on update. Redeploying a live automation does not knock it back to draft; the target environment's lifecycle state is preserved. New automations are created as `Draft` so an operator must explicitly publish on the target.
-- **Connection settings** are filtered on export and merged (not replaced) on import:
-  - Values prefixed with `ENC:` are stripped when `IgnoreEncrypted` is enabled (default).
-  - Field names listed in `IgnoreSettings` are stripped unconditionally.
+- **Connection settings** are filtered on export and merged (not replaced) on import, applied in this precedence order:
+  1. Field names listed in `IgnoreSettings` are stripped unconditionally.
+  2. If `IgnoreSensitive` is enabled, every field marked `[Field(IsSensitive = true)]` on the connection type's settings schema is stripped, regardless of its value — including `$` configuration references. Off by default.
+  3. Values prefixed with `ENC:` are stripped when `IgnoreEncrypted` is enabled (default). `$`-prefixed configuration references are passed through.
   - Settings already present on the target are preserved for any key not in the artifact.
 - **Sensitive trigger / step settings** flagged via the action or trigger's settings schema (`IsSensitive = true`) are stripped from automation artifacts before serialization. The rest of the step (id, alias, name, connection id, input mappings, position, error behaviour, retries) is preserved verbatim.
 
@@ -86,6 +87,7 @@ The error message names the missing alias and points at the absent package.
       "Automate": {
         "Connections": {
           "IgnoreEncrypted": true,
+          "IgnoreSensitive": false,
           "IgnoreSettings": [ "apiKey", "clientSecret" ]
         }
       }
@@ -97,6 +99,7 @@ The error message names the missing alias and points at the absent package.
 | Setting | Default | Description |
 |---|---|---|
 | `Connections.IgnoreEncrypted` | `true` | Strip values starting with `ENC:` from exported connection settings. `$`-prefixed configuration references are always allowed through. |
+| `Connections.IgnoreSensitive` | `false` | Strip every field marked `[Field(IsSensitive = true)]` on the connection type's settings schema, regardless of value. Enable for zero sensitive metadata in deployment artifacts. |
 | `Connections.IgnoreSettings` | `[]` | Specific connection setting field names to always strip on export. Case-insensitive. |
 
 A JSON schema for these options is shipped at `appsettings-schema.Umbraco.Deploy.Automate.json`.

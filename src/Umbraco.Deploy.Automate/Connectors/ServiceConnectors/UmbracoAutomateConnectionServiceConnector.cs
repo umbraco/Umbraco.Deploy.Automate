@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Deploy;
@@ -16,6 +17,7 @@ namespace Umbraco.Deploy.Automate.Connectors.ServiceConnectors;
 public class UmbracoAutomateConnectionServiceConnector(
     IConnectionService connectionService,
     ConnectionTypeCollection connectionTypeCollection,
+    ISensitiveSettingsStripper sensitiveStripper,
     DeployAutomateSettingsAccessor settingsAccessor)
     : UmbracoAutomateEntityServiceConnectorBase<AutomateConnectionArtifact, Connection>(settingsAccessor)
 {
@@ -67,7 +69,7 @@ public class UmbracoAutomateConnectionServiceConnector(
 
         var dependencies = new ArtifactDependencyCollection();
 
-        var filteredSettings = FilterSettings(entity.Settings);
+        var filteredSettings = FilterSettings(entity.Type, entity.Settings);
         var settings = filteredSettings.Count > 0
             ? JsonSerializer.SerializeToElement(filteredSettings)
             : (JsonElement?)null;
@@ -158,23 +160,35 @@ public class UmbracoAutomateConnectionServiceConnector(
     }
 
     /// <summary>
-    /// Filters connection settings based on deploy configuration.
-    /// Removes encrypted values and explicitly ignored fields.
+    /// Filters connection settings based on deploy configuration, applied in this order:
+    /// 1) <c>IgnoreSettings</c> — drop fields named in the explicit blocklist.
+    /// 2) <c>IgnoreSensitive</c> — drop every field marked <c>[Field(IsSensitive=true)]</c>
+    ///    on the connection type's settings POCO, regardless of value.
+    /// 3) <c>IgnoreEncrypted</c> — drop <c>ENC:</c> values, passing <c>$</c>-prefixed
+    ///    configuration references through.
     /// </summary>
-    private Dictionary<string, object?> FilterSettings(Dictionary<string, object?> settings)
+    private Dictionary<string, object?> FilterSettings(string connectionTypeAlias, Dictionary<string, object?> settings)
     {
         var config = _settingsAccessor.Settings.Connections;
-        var filtered = new Dictionary<string, object?>(settings.Count);
 
-        foreach (var kvp in settings)
+        // Layer 2: schema-driven strip of sensitive fields. Run first so the result
+        // feeds into the value-level filters below — fewer entries to walk, and the
+        // explicit blocklist still wins by being applied on top.
+        var working = config.IgnoreSensitive
+            ? sensitiveStripper.StripConnectionSettings(connectionTypeAlias, settings)
+            : settings;
+
+        var filtered = new Dictionary<string, object?>(working.Count);
+
+        foreach (var kvp in working)
         {
-            // Skip explicitly ignored fields
+            // Layer 1: explicit blocklist.
             if (config.IgnoreSettings.Contains(kvp.Key, StringComparer.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            // Skip encrypted values if configured
+            // Layer 3: drop ENC: values; $ config references pass through.
             if (config.IgnoreEncrypted && kvp.Value is string strValue && strValue.StartsWith("ENC:", StringComparison.Ordinal))
             {
                 continue;
