@@ -1,5 +1,10 @@
 using System.Text.Json;
+using Umbraco.Automate.Core.Actions;
+using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Connections;
+using Umbraco.Automate.Core.ControlFlow;
+using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.Triggers;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Deploy;
 using Umbraco.Deploy.Automate.Artifacts;
@@ -20,24 +25,47 @@ public class UmbracoAutomateConnectionServiceConnectorTests
         _settingsAccessorMock = new Mock<DeployAutomateSettingsAccessor>(MockBehavior.Strict, null!);
         _settingsAccessorMock.Setup(x => x.Settings).Returns(new DeployAutomateSettings());
 
-        // Default: httpBasicAuth is registered on the target. Individual tests can clear
-        // or replace this to simulate a missing provider package.
-        _registeredConnectionTypes.Add(BuildConnectionTypeMock("httpBasicAuth"));
+        // Default: httpBasicAuth is registered on the target with a settings schema that
+        // marks ApiKey as sensitive. Individual tests can clear or replace this to simulate
+        // a missing provider package or a different schema.
+        _registeredConnectionTypes.Add(BuildConnectionTypeMock("httpBasicAuth", BuildSchema(sensitiveProperty: "ApiKey")));
 
         var connectionTypeCollection = new ConnectionTypeCollection(() => _registeredConnectionTypes);
+        var stripper = new SensitiveSettingsStripper(
+            new ActionCollection(() => []),
+            new TriggerCollection(() => []),
+            new ControlFlowCollection(() => []),
+            connectionTypeCollection);
 
         _connector = new UmbracoAutomateConnectionServiceConnector(
             _connectionServiceMock.Object,
             connectionTypeCollection,
+            stripper,
             _settingsAccessorMock.Object);
     }
 
-    private static IConnectionType BuildConnectionTypeMock(string alias)
+    private static IConnectionType BuildConnectionTypeMock(string alias, EditableModelSchema? schema = null)
     {
         var mock = new Mock<IConnectionType>();
         mock.SetupGet(x => x.Alias).Returns(alias);
+        mock.Setup(x => x.GetSettingsSchema()).Returns(schema);
         return mock.Object;
     }
+
+    private static EditableModelSchema BuildSchema(string sensitiveProperty) => new()
+    {
+        Fields =
+        [
+            new EditableModelFieldDescriptor
+            {
+                Key = sensitiveProperty,
+                Label = sensitiveProperty,
+                PropertyName = sensitiveProperty,
+                PropertyType = typeof(string),
+                IsSensitive = true,
+            },
+        ],
+    };
 
     private Connection BuildConnection(Dictionary<string, object?>? settings = null) => new()
     {
@@ -164,6 +192,81 @@ public class UmbracoAutomateConnectionServiceConnectorTests
         artifact.ShouldNotBeNull();
         // Only the filtered field was present, so Settings becomes null after filtering.
         artifact.Settings.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task GetArtifactAsync_WithIgnoreSensitiveTrue_StripsSensitiveFieldRegardlessOfValue()
+    {
+        // IgnoreSensitive removes fields by schema (IsSensitive=true) regardless of value —
+        // including $ config references that IgnoreEncrypted would otherwise pass through.
+        _settingsAccessorMock.Setup(x => x.Settings).Returns(new DeployAutomateSettings
+        {
+            Connections = new DeployAutomateConnectionSettings
+            {
+                IgnoreSensitive = true,
+                IgnoreEncrypted = false,
+            },
+        });
+
+        var connection = BuildConnection(new Dictionary<string, object?>
+        {
+            ["ApiKey"] = "$MyService:ApiKey",
+            ["Endpoint"] = "https://api.example.com",
+        });
+        var udi = new GuidUdi(DeployAutomateConstants.UdiEntityType.Connection, connection.Id);
+
+        var artifact = await _connector.GetArtifactAsync(udi, connection);
+
+        artifact.ShouldNotBeNull();
+        artifact.Settings.ShouldNotBeNull();
+        var settings = JsonSerializer.Deserialize<Dictionary<string, object?>>(artifact.Settings.Value);
+        settings.ShouldNotBeNull();
+        settings.ShouldContainKey("Endpoint");
+        settings.ShouldNotContainKey("ApiKey");
+    }
+
+    [Fact]
+    public async Task GetArtifactAsync_WithIgnoreSensitiveFalse_KeepsSensitiveConfigReferences()
+    {
+        // Default: IgnoreSensitive=false. Sensitive fields holding $ refs should pass through,
+        // since the source secret is in IConfiguration on the target, not in the artifact.
+        var connection = BuildConnection(new Dictionary<string, object?>
+        {
+            ["ApiKey"] = "$MyService:ApiKey",
+        });
+        var udi = new GuidUdi(DeployAutomateConstants.UdiEntityType.Connection, connection.Id);
+
+        var artifact = await _connector.GetArtifactAsync(udi, connection);
+
+        artifact.ShouldNotBeNull();
+        artifact.Settings.ShouldNotBeNull();
+        var settings = JsonSerializer.Deserialize<Dictionary<string, object?>>(artifact.Settings.Value);
+        settings.ShouldNotBeNull();
+        settings.ShouldContainKey("ApiKey");
+    }
+
+    [Fact]
+    public async Task GetArtifactAsync_WithUnknownConnectionType_AndIgnoreSensitive_DoesNotThrow()
+    {
+        // The export path runs even when the connection type isn't registered (the deploy
+        // pass that validates registration runs at import time). IgnoreSensitive should
+        // degrade to a no-op rather than blowing up.
+        _registeredConnectionTypes.Clear();
+        _settingsAccessorMock.Setup(x => x.Settings).Returns(new DeployAutomateSettings
+        {
+            Connections = new DeployAutomateConnectionSettings { IgnoreSensitive = true },
+        });
+
+        var connection = BuildConnection(new Dictionary<string, object?> { ["ApiKey"] = "plain" });
+        var udi = new GuidUdi(DeployAutomateConstants.UdiEntityType.Connection, connection.Id);
+
+        var artifact = await _connector.GetArtifactAsync(udi, connection);
+
+        artifact.ShouldNotBeNull();
+        artifact.Settings.ShouldNotBeNull();
+        var settings = JsonSerializer.Deserialize<Dictionary<string, object?>>(artifact.Settings.Value);
+        settings.ShouldNotBeNull();
+        settings.ShouldContainKey("ApiKey");
     }
 
     [Fact]
