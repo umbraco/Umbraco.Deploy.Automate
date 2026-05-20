@@ -2,6 +2,7 @@ using Umbraco.Automate.Core.Triggers;
 using Umbraco.Deploy.Automate.Triggers.Outputs;
 using Umbraco.Deploy.Core.Events;
 
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 namespace Umbraco.Deploy.Automate.Triggers;
 
 /// <summary>
@@ -10,7 +11,8 @@ namespace Umbraco.Deploy.Automate.Triggers;
 [Trigger("umbracoDeploy.workContextPreparing", "Deploy Work Context Preparing",
     Description = "Fires when a deploy work context is being prepared before execution begins.",
     Group = "Deploy",
-    Icon = "icon-settings")]
+    Icon = "icon-settings",
+    RequiredSections = [UmbracoConstants.Applications.Settings])]
 public sealed class WorkContextPreparingTrigger
     : NotificationTriggerBase<object, WorkContextPreparingTriggerOutput, WorkContextPreparingNotification>
 {
