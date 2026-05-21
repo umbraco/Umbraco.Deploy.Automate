@@ -2,6 +2,7 @@ using Umbraco.Automate.Core.Triggers;
 using Umbraco.Deploy.Automate.Triggers.Outputs;
 using Umbraco.Deploy.Core.Events;
 
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 namespace Umbraco.Deploy.Automate.Triggers;
 
 /// <summary>
@@ -14,7 +15,8 @@ namespace Umbraco.Deploy.Automate.Triggers;
 [Trigger("umbracoDeploy.artifactExporting", "Content Exporting",
     Description = "Fires before a content artifact is exported.",
     Group = "Deploy",
-    Icon = "icon-cloud-upload")]
+    Icon = "icon-cloud-upload",
+    RequiredSections = [UmbracoConstants.Applications.Settings])]
 public sealed class ArtifactExportingTrigger
     : NotificationTriggerBase<object, ArtifactExportingTriggerOutput, ArtifactExportingNotification>
 {

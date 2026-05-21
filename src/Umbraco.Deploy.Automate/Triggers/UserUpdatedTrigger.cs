@@ -2,6 +2,7 @@ using Umbraco.Automate.Core.Triggers;
 using Umbraco.Deploy.Automate.Triggers.Outputs;
 using Umbraco.Deploy.Core.Events;
 
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 namespace Umbraco.Deploy.Automate.Triggers;
 
 /// <summary>
@@ -10,7 +11,8 @@ namespace Umbraco.Deploy.Automate.Triggers;
 [Trigger("umbracoDeploy.userUpdated", "User Files Updated",
     Description = "Fires when user-related deploy files are updated on disk.",
     Group = "Deploy",
-    Icon = "icon-user")]
+    Icon = "icon-user",
+    RequiredSections = [UmbracoConstants.Applications.Settings, UmbracoConstants.Applications.Users])]
 public sealed class UserUpdatedTrigger
     : NotificationTriggerBase<object, UserUpdatedTriggerOutput, UserUpdatedNotification>
 {

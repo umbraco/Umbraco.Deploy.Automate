@@ -2,6 +2,7 @@ using Umbraco.Automate.Core.Triggers;
 using Umbraco.Deploy.Automate.Triggers.Outputs;
 using Umbraco.Deploy.Core.Events;
 
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 namespace Umbraco.Deploy.Automate.Triggers;
 
 /// <summary>
@@ -10,7 +11,8 @@ namespace Umbraco.Deploy.Automate.Triggers;
 [Trigger("umbracoDeploy.taskCompleted", "Deployment Succeeded",
     Description = "Fires when a deployment task completes successfully.",
     Group = "Deploy",
-    Icon = "icon-check")]
+    Icon = "icon-check",
+    RequiredSections = [UmbracoConstants.Applications.Settings])]
 public sealed class TaskCompletedTrigger
     : NotificationTriggerBase<object, TaskCompletedTriggerOutput, TaskCompletedNotification>
 {

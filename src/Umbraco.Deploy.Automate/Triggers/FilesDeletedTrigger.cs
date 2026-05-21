@@ -2,6 +2,7 @@ using Umbraco.Automate.Core.Triggers;
 using Umbraco.Deploy.Automate.Triggers.Outputs;
 using Umbraco.Deploy.Core.Events;
 
+using UmbracoConstants = Umbraco.Cms.Core.Constants;
 namespace Umbraco.Deploy.Automate.Triggers;
 
 /// <summary>
@@ -10,7 +11,8 @@ namespace Umbraco.Deploy.Automate.Triggers;
 [Trigger("umbracoDeploy.filesDeleted", "Files Deleted from Disk",
     Description = "Fires when content files are deleted from disk.",
     Group = "Deploy",
-    Icon = "icon-trash")]
+    Icon = "icon-trash",
+    RequiredSections = [UmbracoConstants.Applications.Settings])]
 public sealed class FilesDeletedTrigger
     : NotificationTriggerBase<object, FilesDeletedTriggerOutput, FilesDeletedNotification>
 {
