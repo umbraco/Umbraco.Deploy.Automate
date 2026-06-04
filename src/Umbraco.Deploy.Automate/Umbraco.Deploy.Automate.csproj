@@ -37,6 +37,10 @@
         <InternalsVisibleTo Include="Umbraco.Deploy.Automate.Tests.Unit" />
     </ItemGroup>
 
+    <ItemGroup>
+        <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    </ItemGroup>
+
     <!-- Add JSON schema file to package output -->
     <PropertyGroup>
         <_DeployAutomateJsonSchemaReference>appsettings-schema.Umbraco.Deploy.Automate.json</_DeployAutomateJsonSchemaReference>
