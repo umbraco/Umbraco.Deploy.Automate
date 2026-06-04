@@ -5,6 +5,7 @@ using Umbraco.Cms.Core.Deploy;
 using Umbraco.Cms.Core.Hosting;
 using Umbraco.Deploy.Core.Configuration.DeployConfiguration;
 using Umbraco.Deploy.Core.Environments;
+using Umbraco.Deploy.Core.Exceptions;
 using Umbraco.Deploy.Infrastructure;
 using Umbraco.Deploy.Infrastructure.Core;
 using Umbraco.Deploy.Infrastructure.Environments;
@@ -24,7 +25,6 @@ namespace Umbraco.Deploy.Automate.Actions;
     RequiredSections = [UmbracoConstants.Applications.Settings])]
 public sealed class DeployContentAction : ActionBase<DeployContentSettings, DeployContentOutput>
 {
-
     private readonly CurrentEnvironment _currentEnvironment;
     private readonly IWorkItemFactory _workItemFactory;
     private readonly IExtractEnvironmentInfo _environmentInfoExtractor;
@@ -68,10 +68,32 @@ public sealed class DeployContentAction : ActionBase<DeployContentSettings, Depl
                 StepRunErrorCategory.Validation));
         }
 
+        // Only entity types registered with queue-for-transfer support (and not excluded
+        // by configuration) can be transferred, matching the backoffice behavior.
+        var transferEntityTypes = DeployEntityTypes.GetEntityTypes(
+            _fileTypeCollection,
+            DeployEntityTypeCategories.Content,
+            _deploySettings,
+            detail => detail.Options.SupportsQueueForTransfer);
+        if (!transferEntityTypes.Contains(udi.EntityType))
+        {
+            return Task.FromResult(ActionResult.Failed(
+                new ArgumentException($"Entity type '{udi.EntityType}' cannot be transferred."),
+                StepRunErrorCategory.Validation));
+        }
+
         if (string.IsNullOrWhiteSpace(settings.TargetUrl))
         {
             return Task.FromResult(ActionResult.Failed(
                 new ArgumentException("A target URL is required."),
+                StepRunErrorCategory.Validation));
+        }
+
+        if (settings.IgnoreDependencies &&
+            !_deploySettings.AllowIgnoreDependenciesOperations.HasFlag(IgnoreDependenciesOperations.Transfer))
+        {
+            return Task.FromResult(ActionResult.Failed(
+                new InvalidOperationException("Ignoring dependencies is not allowed for transfer operations. Set Umbraco:Deploy:Settings:AllowIgnoreDependenciesOperations to allow it."),
                 StepRunErrorCategory.Validation));
         }
 
@@ -93,10 +115,11 @@ public sealed class DeployContentAction : ActionBase<DeployContentSettings, Depl
 
         var sourceUrl = new Uri(applicationMainUrl.AbsoluteUri.TrimEnd('/') + DeployAutomateConstants.EnvironmentApi.RootPath);
 
-        // GetEntityTypes with Content flag returns all registered transfer entity types —
-        // the public equivalent of the internal DeployEntityTypes.GetRegisteredTransferEntityTypes().
+        // Content | ContentFile includes all registered transfer entity types plus their
+        // content files (e.g. media files) — the public equivalent of the internal set
+        // Deploy itself passes when starting a backoffice transfer.
         ISet<string> deployEntityTypes = new HashSet<string>(
-            DeployEntityTypes.GetEntityTypes(_fileTypeCollection, DeployEntityTypeCategories.Content));
+            DeployEntityTypes.GetEntityTypes(_fileTypeCollection, DeployEntityTypeCategories.Content | DeployEntityTypeCategories.ContentFile));
 
         var work = _workItemFactory.CreateSourceDeploy(
             _currentEnvironment,
@@ -108,11 +131,18 @@ public sealed class DeployContentAction : ActionBase<DeployContentSettings, Depl
             _deploySettings.ExcludedEntityTypes,
             settings.IgnoreDependencies);
 
+        work.OwnerName = "Umbraco Automate";
+
         try
         {
-            _currentEnvironment.Worker.Begin(work, _deploySettings.SourceDeployTimeout);
+            if (_currentEnvironment.Worker.Begin(work, _deploySettings.SourceDeployTimeout) is null)
+            {
+                return Task.FromResult(ActionResult.Failed(
+                    new InvalidOperationException("The deployment could not be started because the environment is not available."),
+                    StepRunErrorCategory.ServiceUnavailable));
+            }
         }
-        catch (InvalidOperationException ex)
+        catch (EnvironmentBusyException ex)
         {
             return Task.FromResult(ActionResult.Failed(ex, StepRunErrorCategory.ServiceUnavailable));
         }

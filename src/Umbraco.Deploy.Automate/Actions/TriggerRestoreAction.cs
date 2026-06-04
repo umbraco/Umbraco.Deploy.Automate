@@ -3,6 +3,7 @@ using Umbraco.Automate.Core.Actions;
 using Umbraco.Cms.Core.Deploy;
 using Umbraco.Deploy.Core.Configuration.DeployConfiguration;
 using Umbraco.Deploy.Core.Environments;
+using Umbraco.Deploy.Core.Exceptions;
 using Umbraco.Deploy.Infrastructure;
 using Umbraco.Deploy.Infrastructure.Environments;
 using Umbraco.Deploy.Infrastructure.Work;
@@ -21,7 +22,6 @@ namespace Umbraco.Deploy.Automate.Actions;
     RequiredSections = [UmbracoConstants.Applications.Settings])]
 public sealed class TriggerRestoreAction : ActionBase<TriggerRestoreSettings, TriggerRestoreOutput>
 {
-
     private readonly CurrentEnvironment _currentEnvironment;
     private readonly IWorkItemFactory _workItemFactory;
     private readonly IExtractEnvironmentInfo _environmentInfoExtractor;
@@ -55,6 +55,14 @@ public sealed class TriggerRestoreAction : ActionBase<TriggerRestoreSettings, Tr
                 StepRunErrorCategory.Validation));
         }
 
+        if (settings.IgnoreDependencies &&
+            !_deploySettings.AllowIgnoreDependenciesOperations.HasFlag(IgnoreDependenciesOperations.Restore))
+        {
+            return Task.FromResult(ActionResult.Failed(
+                new InvalidOperationException("Ignoring dependencies is not allowed for restore operations. Set Umbraco:Deploy:Settings:AllowIgnoreDependenciesOperations to allow it."),
+                StepRunErrorCategory.Validation));
+        }
+
         IEnvironmentInfo? sourceEnvironment = _environmentInfoExtractor.ResolveEnvironmentInfo(settings.SourceUrl);
         if (sourceEnvironment is null)
         {
@@ -66,12 +74,23 @@ public sealed class TriggerRestoreAction : ActionBase<TriggerRestoreSettings, Tr
         var sourceApiUrl = new Uri(settings.SourceUrl.TrimEnd('/') + DeployAutomateConstants.EnvironmentApi.RootPath);
         sourceEnvironment.SetUri(sourceApiUrl);
 
-        // content=true, contentFile=false → Document/Media/Blueprint (no MediaFile) = RestoreSelectEntityTypes
-        // content=true, contentFile=true  → above + MediaFile                         = RestoreDeployEntityTypes
+        // Build the restore entity type sets from the registered transfer entity types,
+        // honoring each registration's restore options — the public equivalent of the
+        // internal sets Deploy itself passes when starting a backoffice restore:
+        // - select: types that can be selected for restore (SupportsRestore)
+        // - deploy: types permitted to deploy during restore, plus content files (PermittedToRestore)
         var restoreSelectTypes = new HashSet<string>(
-            DeployEntityTypes.GetEntityTypes(_fileTypeCollection, content: true, schema: false, contentFile: false, schemaFile: false));
+            DeployEntityTypes.GetEntityTypes(
+                _fileTypeCollection,
+                DeployEntityTypeCategories.Content,
+                _deploySettings,
+                detail => detail.Options.SupportsRestore));
         var restoreDeployTypes = new HashSet<string>(
-            DeployEntityTypes.GetEntityTypes(_fileTypeCollection, content: true, schema: false, contentFile: true, schemaFile: false));
+            DeployEntityTypes.GetEntityTypes(
+                _fileTypeCollection,
+                DeployEntityTypeCategories.Content | DeployEntityTypeCategories.ContentFile,
+                _deploySettings,
+                detail => detail.Options.PermittedToRestore));
 
         var work = _workItemFactory.CreateTargetRestore(
             _currentEnvironment,
@@ -82,11 +101,18 @@ public sealed class TriggerRestoreAction : ActionBase<TriggerRestoreSettings, Tr
             _deploySettings.ExcludedEntityTypes,
             settings.IgnoreDependencies);
 
+        work.OwnerName = "Umbraco Automate";
+
         try
         {
-            _currentEnvironment.Worker.Begin(work, _deploySettings.SourceDeployTimeout);
+            if (_currentEnvironment.Worker.Begin(work, _deploySettings.SourceDeployTimeout) is null)
+            {
+                return Task.FromResult(ActionResult.Failed(
+                    new InvalidOperationException("The restore could not be started because the environment is not available."),
+                    StepRunErrorCategory.ServiceUnavailable));
+            }
         }
-        catch (InvalidOperationException ex)
+        catch (EnvironmentBusyException ex)
         {
             return Task.FromResult(ActionResult.Failed(ex, StepRunErrorCategory.ServiceUnavailable));
         }
