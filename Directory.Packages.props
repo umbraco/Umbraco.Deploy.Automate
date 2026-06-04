@@ -2,27 +2,23 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
-
   <!-- Versioning + build-time tooling -->
   <ItemGroup>
     <GlobalPackageReference Include="Nerdbank.GitVersioning" Version="3.8.118" />
     <GlobalPackageReference Include="Umbraco.GitVersioning.Extensions" Version="0.2.0" />
-    <GlobalPackageReference Include="Umbraco.JsonSchema.Extensions" Version="0.4.0" PrivateAssets="all" />
+    <GlobalPackageReference Include="Umbraco.JsonSchema.Extensions" Version="0.4.1" PrivateAssets="all" />
   </ItemGroup>
-
   <!-- Umbraco Automate -->
   <ItemGroup>
     <PackageVersion Include="Umbraco.Automate" Version="[0.1.0--preview.422.g8a1061d, 0.999.999)" />
     <PackageVersion Include="Umbraco.Automate.Core" Version="[0.1.0--preview.422.g8a1061d, 0.999.999)" />
-    <PackageVersion Include="Umbraco.Automate.Testing" Version="[0.1.0--preview.422.g8a1061d, 0.999.999)" />
+    <PackageVersion Include="Umbraco.Automate.Testing" Version="0.1.0--preview.469.gd6aa3ca" />
   </ItemGroup>
-
   <!-- Umbraco Deploy -->
   <ItemGroup>
     <PackageVersion Include="Umbraco.Deploy.Core" Version="[17.0.0, 17.999.999)" />
     <PackageVersion Include="Umbraco.Deploy.Infrastructure" Version="[17.0.0, 17.999.999)" />
   </ItemGroup>
-
   <!-- Test dependencies -->
   <ItemGroup>
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
