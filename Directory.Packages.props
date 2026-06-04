@@ -11,9 +11,9 @@
   </ItemGroup>
   <!-- Umbraco Automate -->
   <ItemGroup>
-    <PackageVersion Include="Umbraco.Automate" Version="0.1.0-*" />
-    <PackageVersion Include="Umbraco.Automate.Core" Version="0.1.0-*" />
-    <PackageVersion Include="Umbraco.Automate.Testing" Version="0.1.0-*" />
+    <PackageVersion Include="Umbraco.Automate" Version="17.0.0-*" />
+    <PackageVersion Include="Umbraco.Automate.Core" Version="17.0.0-*" />
+    <PackageVersion Include="Umbraco.Automate.Testing" Version="17.0.0-*" />
   </ItemGroup>
   <!-- Umbraco Deploy -->
   <ItemGroup>
