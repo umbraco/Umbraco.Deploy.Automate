@@ -17,8 +17,8 @@
   </ItemGroup>
   <!-- Umbraco Deploy -->
   <ItemGroup>
-    <PackageVersion Include="Umbraco.Deploy.Core" Version="[17.0.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Deploy.Infrastructure" Version="[17.0.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Deploy.Core" Version="[17.1.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Deploy.Infrastructure" Version="[17.1.0, 17.999.999)" />
   </ItemGroup>
   <!-- Test dependencies -->
   <ItemGroup>
