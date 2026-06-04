@@ -1,0 +1,32 @@
+{
+    "$schema": "https://marketplace.umbraco.com/umbraco-marketplace-schema.json",
+    "AuthorDetails": {
+        "Name": "Umbraco HQ",
+        "Description": "Umbraco HQ",
+        "Url": "https://umbraco.com",
+        "ImageUrl": "https://avatars.githubusercontent.com/u/1419552?s=200&v=4"
+    },
+    "Category": "Automation",
+    "LicenseTypes": ["Free"],
+    "DocumentationUrl": "https://github.com/umbraco/Umbraco.Deploy.Automate",
+    "IssueTrackerUrl": "https://github.com/umbraco/Umbraco.Deploy.Automate/issues",
+    "PackageType": "Package",
+    "PackagesByAuthor": [
+        "Umbraco.Forms",
+        "Umbraco.Workflow",
+        "Umbraco.Deploy.OnPrem",
+        "Umbraco.Commerce",
+        "Umbraco.Engage"
+    ],
+    "RelatedPackages": [
+        {
+            "PackageId": "Umbraco.Automate",
+            "Description": "Core automation system for Umbraco CMS"
+        },
+        {
+            "PackageId": "Umbraco.Deploy.OnPrem",
+            "Description": "Deployment of code and content between Umbraco environments"
+        }
+    ],
+    "Tags": ["umbraco", "deploy", "automate", "automation", "deployment", "triggers", "actions"]
+}

@@ -3,6 +3,7 @@
     <PropertyGroup>
         <Title>Umbraco Deploy Automate</Title>
         <Description>Umbraco Deploy support for Umbraco Automate (artifacts, service connectors, triggers and actions).</Description>
+        <PackageTags>$(PackageTags);umbraco-marketplace</PackageTags>
         <StaticWebAssetBasePath>App_Plugins/Umbraco.Deploy.Automate</StaticWebAssetBasePath>
         <EnableDefaultContentItems>false</EnableDefaultContentItems>
         <!-- Disable compression for static files, because MapStaticAssets() is not used anyway (yet) -->
