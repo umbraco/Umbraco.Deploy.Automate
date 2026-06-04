@@ -100,5 +100,14 @@
         </ItemGroup>
         <JsonPathUpdateValue JsonFile="%(_PackageManifestFiles.FullPath)" Path="$.version" Value="&quot;$(PackageVersion)&quot;" />
     </Target>
+    <ItemGroup>
+      <PackageVersion Update="Umbraco.JsonSchema.Extensions" Version="0.4.1" />
+    </ItemGroup>
+    <ItemGroup>
+      <PackageReference Update="Umbraco.JsonSchema.Extensions">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+      </PackageReference>
+    </ItemGroup>
 
 </Project>

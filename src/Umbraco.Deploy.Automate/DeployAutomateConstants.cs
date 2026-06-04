@@ -6,6 +6,17 @@ namespace Umbraco.Deploy.Automate;
 public static class DeployAutomateConstants
 {
     /// <summary>
+    /// Constants for the Deploy Environment API.
+    /// </summary>
+    internal static class EnvironmentApi
+    {
+        /// <summary>
+        /// The API root path (mirrors the internal Umbraco.Deploy.Infrastructure.ApiConstants.EnvironmentApi.RootPath).
+        /// </summary>
+        internal const string RootPath = "/umbraco/backoffice/deploy/environment";
+    }
+
+    /// <summary>
     /// UDI entity type identifiers for Umbraco.Automate entities.
     /// </summary>
     public static class UdiEntityType
