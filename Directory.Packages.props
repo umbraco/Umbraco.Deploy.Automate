@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageFloatingVersionsEnabled>true</CentralPackageFloatingVersionsEnabled>
   </PropertyGroup>
   <!-- Versioning + build-time tooling -->
   <ItemGroup>
@@ -10,9 +11,9 @@
   </ItemGroup>
   <!-- Umbraco Automate -->
   <ItemGroup>
-    <PackageVersion Include="Umbraco.Automate" Version="[0.1.0--preview.422.g8a1061d, 0.999.999)" />
-    <PackageVersion Include="Umbraco.Automate.Core" Version="[0.1.0--preview.422.g8a1061d, 0.999.999)" />
-    <PackageVersion Include="Umbraco.Automate.Testing" Version="0.1.0--preview.469.gd6aa3ca" />
+    <PackageVersion Include="Umbraco.Automate" Version="0.1.0-*" />
+    <PackageVersion Include="Umbraco.Automate.Core" Version="0.1.0-*" />
+    <PackageVersion Include="Umbraco.Automate.Testing" Version="0.1.0-*" />
   </ItemGroup>
   <!-- Umbraco Deploy -->
   <ItemGroup>
