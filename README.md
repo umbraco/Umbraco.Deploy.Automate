@@ -1,5 +1,5 @@
 <p align="center">
-  <img alt="Umbraco Automate" src="https://raw.githubusercontent.com/umbraco/Umbraco.Deploy.Automate/main/assets/logo-128.png" width="128">
+  <img alt="Umbraco Automate" src="./assets/logo-128.png" width="128">
 </p>
 
 # Umbraco.Deploy.Automate
