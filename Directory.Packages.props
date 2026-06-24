@@ -11,14 +11,14 @@
   </ItemGroup>
   <!-- Umbraco Automate -->
   <ItemGroup>
-    <PackageVersion Include="Umbraco.Automate" Version="17.0.0-*" />
-    <PackageVersion Include="Umbraco.Automate.Core" Version="17.0.0-*" />
-    <PackageVersion Include="Umbraco.Automate.Testing" Version="17.0.0-*" />
+    <PackageVersion Include="Umbraco.Automate" Version="18.0.0-*" />
+    <PackageVersion Include="Umbraco.Automate.Core" Version="18.0.0-*" />
+    <PackageVersion Include="Umbraco.Automate.Testing" Version="18.0.0-*" />
   </ItemGroup>
   <!-- Umbraco Deploy -->
   <ItemGroup>
-    <PackageVersion Include="Umbraco.Deploy.Core" Version="[17.1.0, 17.999.999)" />
-    <PackageVersion Include="Umbraco.Deploy.Infrastructure" Version="[17.1.0, 17.999.999)" />
+    <PackageVersion Include="Umbraco.Deploy.Core" Version="[18.0.0-rc3, 18.999.999)" />
+    <PackageVersion Include="Umbraco.Deploy.Infrastructure" Version="[18.0.0-rc3, 18.999.999)" />
   </ItemGroup>
   <!-- Test dependencies -->
   <ItemGroup>
