@@ -3,6 +3,7 @@ using System.Text.Json;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Automations.Transfer;
+using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Cms.Core;
@@ -23,6 +24,7 @@ public class UmbracoAutomateAutomationServiceConnector(
     IWorkspaceService workspaceService,
     ActionCollection actionCollection,
     TriggerCollection triggerCollection,
+    ControlFlowCollection controlFlowCollection,
     ISensitiveSettingsStripper sensitiveStripper,
     DeployAutomateSettingsAccessor settingsAccessor)
     : UmbracoAutomateEntityServiceConnectorBase<AutomateAutomationArtifact, Automation>(settingsAccessor)
@@ -193,7 +195,12 @@ public class UmbracoAutomateAutomationServiceConnector(
 
         foreach (var step in steps)
         {
-            if (actionCollection.GetByAlias(step.ActionAlias) is null)
+            // A step alias resolves to either an action (IAction) or a control-flow primitive
+            // (IControlFlow, e.g. For Each/While/Parallel/Switch), which live in separate
+            // collections. Mirror the runtime's dual lookup so built-in control flow isn't
+            // mistaken for a missing package.
+            if (actionCollection.GetByAlias(step.ActionAlias) is null
+                && controlFlowCollection.GetByAlias(step.ActionAlias) is null)
             {
                 throw new InvalidOperationException(
                     $"Target site does not contain an action with alias '{step.ActionAlias}' (automation '{artifact.Name}', step '{step.Name}'). " +
