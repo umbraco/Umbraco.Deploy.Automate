@@ -2,6 +2,7 @@ using System.Text.Json;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Automations.Transfer;
+using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Triggers;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Cms.Core;
@@ -20,6 +21,7 @@ public class UmbracoAutomateAutomationServiceConnectorTests
     private readonly Mock<DeployAutomateSettingsAccessor> _settingsAccessorMock;
     private readonly List<IAction> _registeredActions = [];
     private readonly List<ITrigger> _registeredTriggers = [];
+    private readonly List<IControlFlow> _registeredControlFlows = [];
     private readonly UmbracoAutomateAutomationServiceConnector _connector;
 
     public UmbracoAutomateAutomationServiceConnectorTests()
@@ -38,15 +40,18 @@ public class UmbracoAutomateAutomationServiceConnectorTests
         _registeredActions.Add(BuildActionMock("http"));
         _registeredActions.Add(BuildActionMock("delay"));
         _registeredTriggers.Add(BuildTriggerMock("webhook"));
+        _registeredControlFlows.Add(BuildControlFlowMock("umbracoAutomate.forEach"));
 
         var actionCollection = new ActionCollection(() => _registeredActions);
         var triggerCollection = new TriggerCollection(() => _registeredTriggers);
+        var controlFlowCollection = new ControlFlowCollection(() => _registeredControlFlows);
 
         _connector = new UmbracoAutomateAutomationServiceConnector(
             _automationServiceMock.Object,
             _workspaceServiceMock.Object,
             actionCollection,
             triggerCollection,
+            controlFlowCollection,
             _stripperMock.Object,
             _settingsAccessorMock.Object);
     }
@@ -61,6 +66,13 @@ public class UmbracoAutomateAutomationServiceConnectorTests
     private static ITrigger BuildTriggerMock(string alias)
     {
         var mock = new Mock<ITrigger>();
+        mock.SetupGet(x => x.Alias).Returns(alias);
+        return mock.Object;
+    }
+
+    private static IControlFlow BuildControlFlowMock(string alias)
+    {
+        var mock = new Mock<IControlFlow>();
         mock.SetupGet(x => x.Alias).Returns(alias);
         return mock.Object;
     }
@@ -324,6 +336,36 @@ public class UmbracoAutomateAutomationServiceConnectorTests
             [
                 new StepConfiguration { ActionAlias = "http", Name = "Call API" },
                 new StepConfiguration { ActionAlias = "delay", Name = "Wait" },
+            ]);
+        var state = ArtifactDeployState.Create<AutomateAutomationArtifact, Automation>(artifact, null, _connector, 6);
+
+        await _connector.ProcessAsync(state, Mock.Of<IDeployContext>(), 6);
+
+        _automationServiceMock.Verify(
+            x => x.CreateAutomationAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WithControlFlowStep_CreatesAutomation()
+    {
+        // Control-flow steps (For Each, While, etc.) are registered in ControlFlowCollection,
+        // not ActionCollection. The connector must recognise them so a valid automation using
+        // control flow doesn't fail the deploy with a misleading "package not installed" error.
+        var workspaceId = Guid.NewGuid();
+        _workspaceServiceMock
+            .Setup(x => x.GetWorkspaceAsync(workspaceId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Workspace { Alias = "default", Name = "Default" });
+        _automationServiceMock
+            .Setup(x => x.CreateAutomationAsync(It.IsAny<Automation>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Automation a, Guid? _, CancellationToken _) => a);
+
+        var artifact = BuildArtifact(
+            workspaceId: workspaceId,
+            trigger: new TriggerConfiguration { TriggerAlias = "webhook" },
+            steps:
+            [
+                new StepConfiguration { ActionAlias = "umbracoAutomate.forEach", Name = "For Each" },
             ]);
         var state = ArtifactDeployState.Create<AutomateAutomationArtifact, Automation>(artifact, null, _connector, 6);
 
