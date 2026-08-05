@@ -2,6 +2,8 @@ using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Cms.Core;
+using Umbraco.Cms.Core.Deploy;
+using Umbraco.Deploy.Automate.Artifacts;
 using Umbraco.Deploy.Automate.Configuration;
 using Umbraco.Deploy.Automate.Connectors.ServiceConnectors;
 
@@ -160,5 +162,63 @@ public class UmbracoAutomateWorkspaceServiceConnectorTests
     public void UdiEntityType_ReturnsWorkspaceUdiType()
     {
         _connector.UdiEntityType.ShouldBe(DeployAutomateConstants.UdiEntityType.Workspace);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WithExistingWorkspace_DoesNotOverwriteServiceAccountKey()
+    {
+        // The source environment's service account key almost never resolves to a real user
+        // on the target (Umbraco Deploy does not transfer IUser entities), so redeploying an
+        // existing workspace must leave whatever service account is already configured here
+        // untouched rather than clobbering it with the source's key.
+        var existingServiceAccountKey = Guid.NewGuid();
+        var workspace = BuildWorkspace(serviceAccountKey: existingServiceAccountKey);
+        var udi = new GuidUdi(DeployAutomateConstants.UdiEntityType.Workspace, workspace.Id);
+        var artifact = new AutomateWorkspaceArtifact(udi, new ArtifactDependencyCollection())
+        {
+            Alias = "marketing",
+            Name = "Marketing",
+            ServiceAccountKey = Guid.NewGuid(), // the source environment's key — must be ignored
+        };
+        var state = ArtifactDeployState.Create<AutomateWorkspaceArtifact, Workspace>(artifact, workspace, _connector, 3);
+        _workspaceServiceMock
+            .Setup(x => x.UpdateWorkspaceAsync(It.IsAny<Workspace>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Workspace w, Guid? _, CancellationToken _) => w);
+
+        await _connector.ProcessAsync(state, Mock.Of<IDeployContext>(), 3);
+
+        _workspaceServiceMock.Verify(
+            x => x.UpdateWorkspaceAsync(
+                It.Is<Workspace>(w => w.ServiceAccountKey == existingServiceAccountKey),
+                It.IsAny<Guid?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WithNoExistingWorkspace_CreatesWithEmptyServiceAccountKey()
+    {
+        // On first deploy there is nothing configured locally yet — leave the field unset
+        // rather than seeding it with the source environment's (almost certainly wrong) key.
+        var udi = new GuidUdi(DeployAutomateConstants.UdiEntityType.Workspace, Guid.NewGuid());
+        var artifact = new AutomateWorkspaceArtifact(udi, new ArtifactDependencyCollection())
+        {
+            Alias = "marketing",
+            Name = "Marketing",
+            ServiceAccountKey = Guid.NewGuid(),
+        };
+        var state = ArtifactDeployState.Create<AutomateWorkspaceArtifact, Workspace>(artifact, null, _connector, 3);
+        _workspaceServiceMock
+            .Setup(x => x.CreateWorkspaceAsync(It.IsAny<Workspace>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Workspace w, Guid? _, CancellationToken _) => w);
+
+        await _connector.ProcessAsync(state, Mock.Of<IDeployContext>(), 3);
+
+        _workspaceServiceMock.Verify(
+            x => x.CreateWorkspaceAsync(
+                It.Is<Workspace>(w => w.ServiceAccountKey == Guid.Empty),
+                It.IsAny<Guid?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 }
