@@ -136,11 +136,14 @@ public class UmbracoAutomateWorkspaceServiceConnector(
 
         if (state.Entity != null)
         {
-            // Update existing workspace
+            // Update existing workspace. ServiceAccountKey is deliberately NOT applied from
+            // the artifact — see the note on AutomateWorkspaceArtifact.ServiceAccountKey. An
+            // admin may have already configured a working service account on this
+            // environment; overwriting it with the source environment's key here would
+            // silently break every automation in the workspace.
             var workspace = state.Entity;
             workspace.Alias = artifact.Alias!;
             workspace.Name = artifact.Name;
-            workspace.ServiceAccountKey = artifact.ServiceAccountKey;
             workspace.UserGroups = artifact.UserGroups.ToList();
             workspace.AllowedConnections = allowedConnectionIds;
 
@@ -149,13 +152,15 @@ public class UmbracoAutomateWorkspaceServiceConnector(
         else
         {
             // Create new workspace, preserving the artifact's UDI so cross-environment
-            // references resolve and redeployment stays idempotent.
+            // references resolve and redeployment stays idempotent. ServiceAccountKey is
+            // left unset (Guid.Empty) — see the note on
+            // AutomateWorkspaceArtifact.ServiceAccountKey — an admin must configure a real
+            // service account for this environment after the first deploy.
             var workspace = new Workspace
             {
                 Id = artifact.Udi.Guid,
                 Alias = artifact.Alias!,
                 Name = artifact.Name,
-                ServiceAccountKey = artifact.ServiceAccountKey,
                 UserGroups = artifact.UserGroups.ToList(),
                 AllowedConnections = allowedConnectionIds,
             };
