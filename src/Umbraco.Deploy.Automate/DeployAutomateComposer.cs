@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Umbraco.Automate.Core.Notifications;
+using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Deploy.Automate.Configuration;
@@ -10,7 +11,7 @@ namespace Umbraco.Deploy.Automate;
 
 /// <summary>
 /// Registers Deploy Automate with the Umbraco composition pipeline:
-/// configuration, the disk/UDI/transfer registration component, and notification handlers
+/// UDI types, configuration, the disk/transfer registration component, and notification handlers
 /// that keep on-disk artifacts in sync as Automate entities are saved or deleted.
 /// </summary>
 /// <remarks>
@@ -24,6 +25,8 @@ public sealed class DeployAutomateComposer : IComposer
     /// <inheritdoc />
     public void Compose(IUmbracoBuilder builder)
     {
+        RegisterUdiTypes();
+
         // Configuration
         builder.Services.AddOptions<DeployAutomateSettings>()
             .Bind(builder.Config.GetSection("Umbraco:Deploy:Automate"));
@@ -34,7 +37,7 @@ public sealed class DeployAutomateComposer : IComposer
         // validators (workspace existence, parent existence, unique name).
         builder.Services.AddTransient<IWorkspaceGroupDeploySaver, WorkspaceGroupDeploySaver>();
 
-        // Register component for UDI and disk entity type registration
+        // Register component for disk and transfer entity type registration
         builder.Components()
             .Append<DeployAutomateComponent>();
 
@@ -57,5 +60,22 @@ public sealed class DeployAutomateComposer : IComposer
             WorkspaceGroupDeletedDeployRefresherNotificationAsyncHandler>();
         builder.AddNotificationAsyncHandler<AutomationDeletedNotification,
             AutomationDeletedDeployRefresherNotificationAsyncHandler>();
+    }
+
+    /// <remarks>
+    /// Registered during composition rather than from <see cref="DeployAutomateComponent"/>, because
+    /// components do not initialize until after migrations on an upgrade boot
+    /// (<c>CoreRuntime.StartAsync</c> returns early at <c>RuntimeLevel.Upgrading</c>, leaving
+    /// <c>UnattendedUpgradeBackgroundService</c> to initialize them). Deploy's work-item worker starts
+    /// in that window, so registering later meant it could read an Automate artifact before
+    /// <see cref="UdiParser"/> knew these types and throw <see cref="FormatException"/> on the UDI.
+    /// These calls are static and need no services, so composition is early enough to close that gap.
+    /// </remarks>
+    private static void RegisterUdiTypes()
+    {
+        UdiParser.RegisterUdiType(DeployAutomateConstants.UdiEntityType.Connection, UdiType.GuidUdi);
+        UdiParser.RegisterUdiType(DeployAutomateConstants.UdiEntityType.Workspace, UdiType.GuidUdi);
+        UdiParser.RegisterUdiType(DeployAutomateConstants.UdiEntityType.WorkspaceGroup, UdiType.GuidUdi);
+        UdiParser.RegisterUdiType(DeployAutomateConstants.UdiEntityType.Automation, UdiType.GuidUdi);
     }
 }
