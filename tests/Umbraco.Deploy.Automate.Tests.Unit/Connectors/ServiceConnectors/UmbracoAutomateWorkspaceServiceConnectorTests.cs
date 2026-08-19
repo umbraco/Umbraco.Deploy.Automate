@@ -3,6 +3,8 @@ using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Deploy;
+using Umbraco.Cms.Core.Models.Membership;
+using Umbraco.Cms.Core.Services;
 using Umbraco.Deploy.Automate.Artifacts;
 using Umbraco.Deploy.Automate.Configuration;
 using Umbraco.Deploy.Automate.Connectors.ServiceConnectors;
@@ -15,6 +17,7 @@ public class UmbracoAutomateWorkspaceServiceConnectorTests
     private readonly Mock<IWorkspaceGroupService> _groupServiceMock = new();
     private readonly Mock<IAutomationService> _automationServiceMock = new();
     private readonly Mock<IConnectionService> _connectionServiceMock = new();
+    private readonly Mock<IUserGroupService> _userGroupServiceMock = new();
     private readonly Mock<DeployAutomateSettingsAccessor> _settingsAccessorMock;
     private readonly UmbracoAutomateWorkspaceServiceConnector _connector;
 
@@ -28,6 +31,7 @@ public class UmbracoAutomateWorkspaceServiceConnectorTests
             _groupServiceMock.Object,
             _automationServiceMock.Object,
             _connectionServiceMock.Object,
+            _userGroupServiceMock.Object,
             _settingsAccessorMock.Object);
     }
 
@@ -217,6 +221,70 @@ public class UmbracoAutomateWorkspaceServiceConnectorTests
         _workspaceServiceMock.Verify(
             x => x.CreateWorkspaceAsync(
                 It.Is<Workspace>(w => w.ServiceAccountKey == Guid.Empty),
+                It.IsAny<Guid?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WithNoExistingWorkspace_DropsUserGroupsThatDoNotResolve()
+    {
+        // Umbraco Deploy doesn't guarantee user groups travel with a workspace (they're often
+        // excluded from a schema deploy). A dangling group key left on the workspace breaks
+        // the user-group picker on save, the same way an unresolved ServiceAccountKey used to.
+        var resolvableGroup = Guid.NewGuid();
+        var danglingGroup = Guid.NewGuid();
+        var udi = new GuidUdi(DeployAutomateConstants.UdiEntityType.Workspace, Guid.NewGuid());
+        var artifact = new AutomateWorkspaceArtifact(udi, new ArtifactDependencyCollection())
+        {
+            Alias = "marketing",
+            Name = "Marketing",
+            UserGroups = [resolvableGroup, danglingGroup],
+        };
+        var state = ArtifactDeployState.Create<AutomateWorkspaceArtifact, Workspace>(artifact, null, _connector, 3);
+        _userGroupServiceMock
+            .Setup(x => x.GetAsync(It.IsAny<IEnumerable<Guid>>()))
+            .ReturnsAsync([Mock.Of<IUserGroup>(g => g.Key == resolvableGroup)]);
+        _workspaceServiceMock
+            .Setup(x => x.CreateWorkspaceAsync(It.IsAny<Workspace>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Workspace w, Guid? _, CancellationToken _) => w);
+
+        await _connector.ProcessAsync(state, Mock.Of<IDeployContext>(), 3);
+
+        _workspaceServiceMock.Verify(
+            x => x.CreateWorkspaceAsync(
+                It.Is<Workspace>(w => w.UserGroups.SequenceEqual(new[] { resolvableGroup })),
+                It.IsAny<Guid?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WithExistingWorkspace_DropsUserGroupsThatDoNotResolve()
+    {
+        var resolvableGroup = Guid.NewGuid();
+        var danglingGroup = Guid.NewGuid();
+        var workspace = BuildWorkspace();
+        var udi = new GuidUdi(DeployAutomateConstants.UdiEntityType.Workspace, workspace.Id);
+        var artifact = new AutomateWorkspaceArtifact(udi, new ArtifactDependencyCollection())
+        {
+            Alias = "marketing",
+            Name = "Marketing",
+            UserGroups = [resolvableGroup, danglingGroup],
+        };
+        var state = ArtifactDeployState.Create<AutomateWorkspaceArtifact, Workspace>(artifact, workspace, _connector, 3);
+        _userGroupServiceMock
+            .Setup(x => x.GetAsync(It.IsAny<IEnumerable<Guid>>()))
+            .ReturnsAsync([Mock.Of<IUserGroup>(g => g.Key == resolvableGroup)]);
+        _workspaceServiceMock
+            .Setup(x => x.UpdateWorkspaceAsync(It.IsAny<Workspace>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Workspace w, Guid? _, CancellationToken _) => w);
+
+        await _connector.ProcessAsync(state, Mock.Of<IDeployContext>(), 3);
+
+        _workspaceServiceMock.Verify(
+            x => x.UpdateWorkspaceAsync(
+                It.Is<Workspace>(w => w.UserGroups.SequenceEqual(new[] { resolvableGroup })),
                 It.IsAny<Guid?>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
