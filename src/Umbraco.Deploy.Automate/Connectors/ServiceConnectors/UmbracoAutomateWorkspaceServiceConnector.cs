@@ -4,6 +4,7 @@ using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Workspaces;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Deploy;
+using Umbraco.Cms.Core.Services;
 using Umbraco.Deploy.Automate.Artifacts;
 using Umbraco.Deploy.Automate.Configuration;
 
@@ -19,6 +20,7 @@ public class UmbracoAutomateWorkspaceServiceConnector(
     IWorkspaceGroupService groupService,
     IAutomationService automationService,
     IConnectionService connectionService,
+    IUserGroupService userGroupService,
     DeployAutomateSettingsAccessor settingsAccessor)
     : UmbracoAutomateEntityServiceConnectorBase<AutomateWorkspaceArtifact, Workspace>(settingsAccessor)
 {
@@ -134,6 +136,16 @@ public class UmbracoAutomateWorkspaceServiceConnector(
             }
         }
 
+        // Only keep user groups that actually exist on this environment. Umbraco Deploy
+        // doesn't guarantee user groups travel with the workspace (they're often excluded
+        // from a schema deploy), so a stale key here would leave the workspace pointing at a
+        // group that doesn't resolve, which breaks the picker in the same way an unresolved
+        // ServiceAccountKey used to — see the frontend fix in Umbraco.Automate for the
+        // matching client-side guard.
+        var resolvedUserGroups = artifact.UserGroups.Count == 0
+            ? new List<Guid>()
+            : (await userGroupService.GetAsync(artifact.UserGroups)).Select(userGroup => userGroup.Key).ToList();
+
         if (state.Entity != null)
         {
             // Update existing workspace. ServiceAccountKey is deliberately NOT applied from
@@ -144,7 +156,7 @@ public class UmbracoAutomateWorkspaceServiceConnector(
             var workspace = state.Entity;
             workspace.Alias = artifact.Alias!;
             workspace.Name = artifact.Name;
-            workspace.UserGroups = artifact.UserGroups.ToList();
+            workspace.UserGroups = resolvedUserGroups;
             workspace.AllowedConnections = allowedConnectionIds;
 
             state.Entity = await workspaceService.UpdateWorkspaceAsync(workspace, cancellationToken: cancellationToken);
@@ -161,7 +173,7 @@ public class UmbracoAutomateWorkspaceServiceConnector(
                 Id = artifact.Udi.Guid,
                 Alias = artifact.Alias!,
                 Name = artifact.Name,
-                UserGroups = artifact.UserGroups.ToList(),
+                UserGroups = resolvedUserGroups,
                 AllowedConnections = allowedConnectionIds,
             };
 
