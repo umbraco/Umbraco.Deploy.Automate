@@ -67,6 +67,33 @@ public class UmbracoAutomateConnectionServiceConnectorTests
         ],
     };
 
+    // Mirrors an OAuth-based connection type such as Slack: the credential reference field is
+    // identified by the OAuth editor UI alias. The property name is deliberately NOT the
+    // conventional "OAuthCredentialsId" so tests prove detection by alias.
+    private static EditableModelSchema BuildOAuthSchema(string oauthProperty) => new()
+    {
+        Fields =
+        [
+            new EditableModelFieldDescriptor
+            {
+                Key = oauthProperty,
+                Label = oauthProperty,
+                PropertyName = oauthProperty,
+                PropertyType = typeof(Guid?),
+                EditorUiAlias = "Umb.Automate.OAuth",
+            },
+        ],
+    };
+
+    private static AutomateConnectionArtifact BuildArtifact(Guid id, Dictionary<string, object?>? settings = null)
+        => new(new GuidUdi(DeployAutomateConstants.UdiEntityType.Connection, id), new ArtifactDependencyCollection())
+        {
+            Alias = "test-connection",
+            Name = "Test Connection",
+            Type = "httpBasicAuth",
+            Settings = settings is null ? null : JsonSerializer.SerializeToElement(settings),
+        };
+
     private Connection BuildConnection(Dictionary<string, object?>? settings = null) => new()
     {
         Alias = "test-connection",
@@ -380,5 +407,168 @@ public class UmbracoAutomateConnectionServiceConnectorTests
         _connectionServiceMock.Verify(
             x => x.CreateConnectionAsync(It.Is<Connection>(c => c.Type == "httpBasicAuth"), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WithExistingConnection_UpdatesAndMergesSettings()
+    {
+        var id = Guid.NewGuid();
+        var existing = BuildConnection(new Dictionary<string, object?>
+        {
+            ["Endpoint"] = "https://old.example.com",
+            ["TargetOnly"] = "kept",
+        });
+        existing.Id = id;
+        existing.Alias = "old-alias";
+        existing.Name = "Old Name";
+
+        var artifact = BuildArtifact(id, new Dictionary<string, object?> { ["Endpoint"] = "https://new.example.com" });
+        var state = ArtifactDeployState.Create<AutomateConnectionArtifact, Connection>(artifact, existing, _connector, 2);
+        Connection? updated = null;
+        _connectionServiceMock
+            .Setup(x => x.UpdateConnectionAsync(It.IsAny<Connection>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .Callback((Connection c, Guid? _, CancellationToken _) => updated = c)
+            .ReturnsAsync((Connection c, Guid? _, CancellationToken _) => c);
+
+        await _connector.ProcessAsync(state, Mock.Of<IDeployContext>(), 2);
+
+        updated.ShouldNotBeNull();
+        updated.Alias.ShouldBe("test-connection");
+        updated.Name.ShouldBe("Test Connection");
+        updated.Settings["Endpoint"]!.ToString().ShouldBe("https://new.example.com");
+        // Merge semantics: keys absent from the artifact keep the target's value.
+        updated.Settings["TargetOnly"].ShouldBe("kept");
+        _connectionServiceMock.Verify(
+            x => x.CreateConnectionAsync(It.IsAny<Connection>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task GetArtifactAsync_WithOAuthEditorField_StripsCredentialReference()
+    {
+        _registeredConnectionTypes.Clear();
+        _registeredConnectionTypes.Add(BuildConnectionTypeMock("httpBasicAuth", BuildOAuthSchema("WorkspaceCredential")));
+
+        var connection = BuildConnection(new Dictionary<string, object?>
+        {
+            ["workspaceCredential"] = Guid.NewGuid(),
+            ["Endpoint"] = "https://api.example.com",
+        });
+        var udi = new GuidUdi(DeployAutomateConstants.UdiEntityType.Connection, connection.Id);
+
+        var artifact = await _connector.GetArtifactAsync(udi, connection);
+
+        artifact.ShouldNotBeNull();
+        artifact.Settings.ShouldNotBeNull();
+        var settings = JsonSerializer.Deserialize<Dictionary<string, object?>>(artifact.Settings.Value);
+        settings.ShouldNotBeNull();
+        settings.ShouldContainKey("Endpoint");
+        settings.ShouldNotContainKey("workspaceCredential");
+    }
+
+    [Fact]
+    public async Task GetArtifactAsync_WithUnregisteredConnectionType_StripsOAuthCredentialsIdByPropertyName()
+    {
+        // No schema available: detection falls back to the conventional property name,
+        // regardless of IgnoreSettings/IgnoreSensitive configuration.
+        _registeredConnectionTypes.Clear();
+
+        var connection = BuildConnection(new Dictionary<string, object?>
+        {
+            ["oAuthCredentialsId"] = Guid.NewGuid(),
+            ["Endpoint"] = "https://api.example.com",
+        });
+        var udi = new GuidUdi(DeployAutomateConstants.UdiEntityType.Connection, connection.Id);
+
+        var artifact = await _connector.GetArtifactAsync(udi, connection);
+
+        artifact.ShouldNotBeNull();
+        artifact.Settings.ShouldNotBeNull();
+        var settings = JsonSerializer.Deserialize<Dictionary<string, object?>>(artifact.Settings.Value);
+        settings.ShouldNotBeNull();
+        settings.ShouldContainKey("Endpoint");
+        settings.ShouldNotContainKey("oAuthCredentialsId");
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WithExistingConnection_KeepsTargetOAuthCredentialFromOldArtifact()
+    {
+        // An artifact produced before OAuth fields were stripped on export still carries the
+        // source environment's credential id. It must not overwrite the target's working one.
+        _registeredConnectionTypes.Clear();
+        _registeredConnectionTypes.Add(BuildConnectionTypeMock("httpBasicAuth", BuildOAuthSchema("OAuthCredentialsId")));
+
+        var id = Guid.NewGuid();
+        var targetCredentialId = Guid.NewGuid();
+        var existing = BuildConnection(new Dictionary<string, object?>
+        {
+            ["oAuthCredentialsId"] = targetCredentialId,
+        });
+        existing.Id = id;
+
+        var artifact = BuildArtifact(id, new Dictionary<string, object?>
+        {
+            ["oAuthCredentialsId"] = Guid.NewGuid(),
+            ["Endpoint"] = "https://api.example.com",
+        });
+        var state = ArtifactDeployState.Create<AutomateConnectionArtifact, Connection>(artifact, existing, _connector, 2);
+        Connection? updated = null;
+        _connectionServiceMock
+            .Setup(x => x.UpdateConnectionAsync(It.IsAny<Connection>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .Callback((Connection c, Guid? _, CancellationToken _) => updated = c)
+            .ReturnsAsync((Connection c, Guid? _, CancellationToken _) => c);
+
+        await _connector.ProcessAsync(state, Mock.Of<IDeployContext>(), 2);
+
+        updated.ShouldNotBeNull();
+        updated.Settings["oAuthCredentialsId"].ShouldBe(targetCredentialId);
+        updated.Settings["Endpoint"]!.ToString().ShouldBe("https://api.example.com");
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WithNewConnection_LeavesOAuthCredentialFromOldArtifactAbsent()
+    {
+        _registeredConnectionTypes.Clear();
+        _registeredConnectionTypes.Add(BuildConnectionTypeMock("httpBasicAuth", BuildOAuthSchema("WorkspaceCredential")));
+
+        var artifact = BuildArtifact(Guid.NewGuid(), new Dictionary<string, object?>
+        {
+            ["workspaceCredential"] = Guid.NewGuid(),
+            ["Endpoint"] = "https://api.example.com",
+        });
+        var state = ArtifactDeployState.Create<AutomateConnectionArtifact, Connection>(artifact, null, _connector, 2);
+        Connection? created = null;
+        _connectionServiceMock
+            .Setup(x => x.CreateConnectionAsync(It.IsAny<Connection>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .Callback((Connection c, Guid? _, CancellationToken _) => created = c)
+            .ReturnsAsync((Connection c, Guid? _, CancellationToken _) => c);
+
+        await _connector.ProcessAsync(state, Mock.Of<IDeployContext>(), 2);
+
+        created.ShouldNotBeNull();
+        created.Settings.ShouldNotContainKey("workspaceCredential");
+        created.Settings.ShouldContainKey("Endpoint");
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WithNewConnection_DropsOAuthCredentialsIdByPropertyNameWhenSchemaHasNoOAuthField()
+    {
+        // The default registered type's schema has no OAuth field, so detection relies on the
+        // conventional property name.
+        var artifact = BuildArtifact(Guid.NewGuid(), new Dictionary<string, object?>
+        {
+            ["oAuthCredentialsId"] = Guid.NewGuid(),
+        });
+        var state = ArtifactDeployState.Create<AutomateConnectionArtifact, Connection>(artifact, null, _connector, 2);
+        Connection? created = null;
+        _connectionServiceMock
+            .Setup(x => x.CreateConnectionAsync(It.IsAny<Connection>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .Callback((Connection c, Guid? _, CancellationToken _) => created = c)
+            .ReturnsAsync((Connection c, Guid? _, CancellationToken _) => c);
+
+        await _connector.ProcessAsync(state, Mock.Of<IDeployContext>(), 2);
+
+        created.ShouldNotBeNull();
+        created.Settings.ShouldNotContainKey("oAuthCredentialsId");
     }
 }

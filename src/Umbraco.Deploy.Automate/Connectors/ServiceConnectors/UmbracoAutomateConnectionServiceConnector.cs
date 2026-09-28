@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Connections;
+using Umbraco.Automate.Core.Settings;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Deploy;
 using Umbraco.Deploy.Automate.Artifacts;
@@ -126,6 +127,15 @@ public class UmbracoAutomateConnectionServiceConnector(
             settings = artifact.Settings.Value.Deserialize<Dictionary<string, object?>>() ?? [];
         }
 
+        // Environment-specific fields (OAuth credential references) are deliberately NOT
+        // applied from the artifact, even though current exports no longer include them —
+        // artifacts produced by older versions (or checked into disk-based deploys) may still
+        // carry the source environment's credential id, which doesn't exist on this target.
+        // Dropping them here means the update path below keeps the target's existing value
+        // via the merge, and the create path leaves the field unset so an admin authenticates
+        // the connection on this environment. See RemoveEnvironmentSpecificSettings.
+        settings = RemoveEnvironmentSpecificSettings(artifact.Type, settings);
+
         if (state.Entity != null)
         {
             // Update existing connection
@@ -160,7 +170,10 @@ public class UmbracoAutomateConnectionServiceConnector(
     }
 
     /// <summary>
-    /// Filters connection settings based on deploy configuration, applied in this order:
+    /// Filters connection settings for export. Environment-specific fields (OAuth credential
+    /// references, see <see cref="RemoveEnvironmentSpecificSettings"/>) are always removed
+    /// first, independent of configuration. The rest is driven by deploy configuration,
+    /// applied in this order:
     /// 1) <c>IgnoreSettings</c> — drop fields named in the explicit blocklist.
     /// 2) <c>IgnoreSensitive</c> — drop every field marked <c>[Field(IsSensitive=true)]</c>
     ///    on the connection type's settings POCO, regardless of value.
@@ -171,12 +184,15 @@ public class UmbracoAutomateConnectionServiceConnector(
     {
         var config = _settingsAccessor.Settings.Connections;
 
+        // Always-on: environment-specific values never leave the source environment.
+        var working = RemoveEnvironmentSpecificSettings(connectionTypeAlias, settings);
+
         // Layer 2: schema-driven strip of sensitive fields. Run first so the result
         // feeds into the value-level filters below — fewer entries to walk, and the
         // explicit blocklist still wins by being applied on top.
-        var working = config.IgnoreSensitive
-            ? sensitiveStripper.StripConnectionSettings(connectionTypeAlias, settings)
-            : settings;
+        working = config.IgnoreSensitive
+            ? sensitiveStripper.StripConnectionSettings(connectionTypeAlias, working)
+            : working;
 
         var filtered = new Dictionary<string, object?>(working.Count);
 
@@ -199,4 +215,71 @@ public class UmbracoAutomateConnectionServiceConnector(
 
         return filtered;
     }
+
+    /// <summary>
+    /// Removes settings that hold environment-specific values and must never be transferred
+    /// between environments, regardless of deploy configuration.
+    /// </summary>
+    /// <remarks>
+    /// Today this covers OAuth credential references: OAuth-based connection types (e.g. Slack)
+    /// store a Guid pointing at a row in the OpenIddict credentials table of the environment
+    /// where the user authenticated. That table is never deployed, so the id doesn't resolve
+    /// anywhere else — applying it on a target would overwrite a working credential (update)
+    /// or store a dangling reference (create). Fields are detected from the connection type's
+    /// settings schema by editor UI alias or property name, matched against settings keys
+    /// case-insensitively; if the connection type isn't registered on this environment (no
+    /// schema available), matching falls back to the conventional property name alone.
+    /// </remarks>
+    private Dictionary<string, object?> RemoveEnvironmentSpecificSettings(
+        string connectionTypeAlias,
+        Dictionary<string, object?> settings)
+    {
+        if (settings.Count == 0)
+        {
+            return settings;
+        }
+
+        var environmentSpecificKeys = GetEnvironmentSpecificSettingKeys(connectionTypeAlias);
+
+        if (!settings.Keys.Any(environmentSpecificKeys.Contains))
+        {
+            return settings;
+        }
+
+        return settings
+            .Where(kvp => !environmentSpecificKeys.Contains(kvp.Key))
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+    }
+
+    private HashSet<string> GetEnvironmentSpecificSettingKeys(string connectionTypeAlias)
+    {
+        var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            DeployAutomateConstants.EnvironmentSpecificConnectionSettings.OAuthCredentialsIdPropertyName,
+        };
+
+        var schema = connectionTypeCollection.GetByAlias(connectionTypeAlias)?.GetSettingsSchema();
+        if (schema is null)
+        {
+            return keys;
+        }
+
+        foreach (var field in schema.Fields.Where(IsEnvironmentSpecificField))
+        {
+            keys.Add(field.PropertyName);
+            keys.Add(field.Key);
+        }
+
+        return keys;
+    }
+
+    private static bool IsEnvironmentSpecificField(EditableModelFieldDescriptor field)
+        => string.Equals(
+               field.EditorUiAlias,
+               DeployAutomateConstants.EnvironmentSpecificConnectionSettings.OAuthEditorUiAlias,
+               StringComparison.OrdinalIgnoreCase)
+           || string.Equals(
+               field.PropertyName,
+               DeployAutomateConstants.EnvironmentSpecificConnectionSettings.OAuthCredentialsIdPropertyName,
+               StringComparison.OrdinalIgnoreCase);
 }
