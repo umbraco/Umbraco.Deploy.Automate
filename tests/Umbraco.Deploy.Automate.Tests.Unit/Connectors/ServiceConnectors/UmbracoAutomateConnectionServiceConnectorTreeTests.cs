@@ -3,7 +3,9 @@ using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Triggers;
+using Umbraco.Automate.Core.Triggers.Webhooks;
 using Umbraco.Cms.Core;
 using Umbraco.Deploy.Automate.Configuration;
 using Umbraco.Deploy.Automate.Connectors.ServiceConnectors;
@@ -17,6 +19,9 @@ public class UmbracoAutomateConnectionServiceConnectorTreeTests
 
     public UmbracoAutomateConnectionServiceConnectorTreeTests()
     {
+        // Deploy registers UDI types from the connectors' [UdiDefinition] at composition; no composition runs here.
+        UdiParser.RegisterUdiType(DeployAutomateConstants.UdiEntityType.Connection, UdiType.GuidUdi);
+
         var settingsAccessorMock = new Mock<DeployAutomateSettingsAccessor>(MockBehavior.Strict, null!);
         settingsAccessorMock.Setup(x => x.Settings).Returns(new DeployAutomateSettings());
 
@@ -25,7 +30,9 @@ public class UmbracoAutomateConnectionServiceConnectorTreeTests
             new ActionCollection(() => []),
             new TriggerCollection(() => []),
             new ControlFlowCollection(() => []),
-            connectionTypeCollection);
+            connectionTypeCollection,
+            new WebhookAuthenticatorCollection(() => []),
+            new NotificationChannelCollection(() => []));
 
         _connector = new UmbracoAutomateConnectionServiceConnector(
             _connectionServiceMock.Object,

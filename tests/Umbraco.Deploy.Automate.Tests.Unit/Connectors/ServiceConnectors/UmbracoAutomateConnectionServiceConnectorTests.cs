@@ -4,7 +4,9 @@ using Umbraco.Automate.Core.Automations.Transfer;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.ControlFlow;
 using Umbraco.Automate.Core.Settings;
+using Umbraco.Automate.Core.Notifications.Channels;
 using Umbraco.Automate.Core.Triggers;
+using Umbraco.Automate.Core.Triggers.Webhooks;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Deploy;
 using Umbraco.Deploy.Automate.Artifacts;
@@ -35,7 +37,9 @@ public class UmbracoAutomateConnectionServiceConnectorTests
             new ActionCollection(() => []),
             new TriggerCollection(() => []),
             new ControlFlowCollection(() => []),
-            connectionTypeCollection);
+            connectionTypeCollection,
+            new WebhookAuthenticatorCollection(() => []),
+            new NotificationChannelCollection(() => []));
 
         _connector = new UmbracoAutomateConnectionServiceConnector(
             _connectionServiceMock.Object,

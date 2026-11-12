@@ -1,6 +1,8 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Cms.Core;
+using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Deploy;
 using Umbraco.Deploy.Core.Configuration.DeployConfiguration;
 using Umbraco.Deploy.Core.Connectors.ServiceConnectors;
@@ -25,19 +27,40 @@ public sealed class AddToQueueAction : ActionBase<AddToQueueSettings, AddToQueue
     private readonly IServiceConnectorFactory _serviceConnectorFactory;
     private readonly IFileTypeCollection _fileTypeCollection;
     private readonly DeploySettings _deploySettings;
+    private readonly IOptionsMonitor<DeployEntityTypesOptions> _deployEntityTypesOptions;
 
+    [ActivatorUtilitiesConstructor]
+    public AddToQueueAction(
+        ActionInfrastructure infrastructure,
+        ITransferQueue transferQueue,
+        IServiceConnectorFactory serviceConnectorFactory,
+        IFileTypeCollection fileTypeCollection,
+        IOptions<DeploySettings> deploySettings,
+        IOptionsMonitor<DeployEntityTypesOptions> deployEntityTypesOptions)
+        : base(infrastructure)
+    {
+        _deployEntityTypesOptions = deployEntityTypesOptions;
+        _transferQueue = transferQueue;
+        _serviceConnectorFactory = serviceConnectorFactory;
+        _fileTypeCollection = fileTypeCollection;
+        _deploySettings = deploySettings.Value;
+    }
+
+    [Obsolete("Use the constructor taking IOptionsMonitor<DeployEntityTypesOptions>. Will be removed in v21.0.0.")]
     public AddToQueueAction(
         ActionInfrastructure infrastructure,
         ITransferQueue transferQueue,
         IServiceConnectorFactory serviceConnectorFactory,
         IFileTypeCollection fileTypeCollection,
         IOptions<DeploySettings> deploySettings)
-        : base(infrastructure)
+        : this(
+            infrastructure,
+            transferQueue,
+            serviceConnectorFactory,
+            fileTypeCollection,
+            deploySettings,
+            StaticServiceProvider.Instance.GetRequiredService<IOptionsMonitor<DeployEntityTypesOptions>>())
     {
-        _transferQueue = transferQueue;
-        _serviceConnectorFactory = serviceConnectorFactory;
-        _fileTypeCollection = fileTypeCollection;
-        _deploySettings = deploySettings.Value;
     }
 
     public override async Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
@@ -60,11 +83,11 @@ public sealed class AddToQueueAction : ActionBase<AddToQueueSettings, AddToQueue
 
         // Only entity types registered with queue-for-transfer support (and not excluded
         // by configuration) can be added to the queue, matching the backoffice behavior.
-        var transferEntityTypes = DeployEntityTypes.GetEntityTypes(
+        var transferEntityTypes = _deployEntityTypesOptions.CurrentValue.GetEntityTypes(
             _fileTypeCollection,
             DeployEntityTypeCategories.Content,
             _deploySettings,
-            detail => detail.Options.SupportsQueueForTransfer);
+            options => options.SupportsQueueForTransfer);
         if (!transferEntityTypes.Contains(udi.EntityType))
         {
             return ActionResult.Failed(

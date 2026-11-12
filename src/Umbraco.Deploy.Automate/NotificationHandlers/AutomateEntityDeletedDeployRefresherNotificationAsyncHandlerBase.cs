@@ -31,8 +31,6 @@ public abstract class AutomateEntityDeletedDeployRefresherNotificationAsyncHandl
         _diskEntityService = diskEntityService;
         _signatureService = signatureService;
         _entityType = entityType;
-
-        diskEntityService.RegisterDiskEntityType(entityType);
     }
 
     /// <summary>

@@ -1,5 +1,7 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Actions;
+using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Deploy;
 using Umbraco.Deploy.Core.Configuration.DeployConfiguration;
 using Umbraco.Deploy.Core.Environments;
@@ -27,7 +29,28 @@ public sealed class TriggerRestoreAction : ActionBase<TriggerRestoreSettings, Tr
     private readonly IExtractEnvironmentInfo _environmentInfoExtractor;
     private readonly IFileTypeCollection _fileTypeCollection;
     private readonly DeploySettings _deploySettings;
+    private readonly IOptionsMonitor<DeployEntityTypesOptions> _deployEntityTypesOptions;
 
+    [ActivatorUtilitiesConstructor]
+    public TriggerRestoreAction(
+        ActionInfrastructure infrastructure,
+        CurrentEnvironment currentEnvironment,
+        IWorkItemFactory workItemFactory,
+        IExtractEnvironmentInfo environmentInfoExtractor,
+        IFileTypeCollection fileTypeCollection,
+        IOptions<DeploySettings> deploySettings,
+        IOptionsMonitor<DeployEntityTypesOptions> deployEntityTypesOptions)
+        : base(infrastructure)
+    {
+        _deployEntityTypesOptions = deployEntityTypesOptions;
+        _currentEnvironment = currentEnvironment;
+        _workItemFactory = workItemFactory;
+        _environmentInfoExtractor = environmentInfoExtractor;
+        _fileTypeCollection = fileTypeCollection;
+        _deploySettings = deploySettings.Value;
+    }
+
+    [Obsolete("Use the constructor taking IOptionsMonitor<DeployEntityTypesOptions>. Will be removed in v21.0.0.")]
     public TriggerRestoreAction(
         ActionInfrastructure infrastructure,
         CurrentEnvironment currentEnvironment,
@@ -35,13 +58,15 @@ public sealed class TriggerRestoreAction : ActionBase<TriggerRestoreSettings, Tr
         IExtractEnvironmentInfo environmentInfoExtractor,
         IFileTypeCollection fileTypeCollection,
         IOptions<DeploySettings> deploySettings)
-        : base(infrastructure)
+        : this(
+            infrastructure,
+            currentEnvironment,
+            workItemFactory,
+            environmentInfoExtractor,
+            fileTypeCollection,
+            deploySettings,
+            StaticServiceProvider.Instance.GetRequiredService<IOptionsMonitor<DeployEntityTypesOptions>>())
     {
-        _currentEnvironment = currentEnvironment;
-        _workItemFactory = workItemFactory;
-        _environmentInfoExtractor = environmentInfoExtractor;
-        _fileTypeCollection = fileTypeCollection;
-        _deploySettings = deploySettings.Value;
     }
 
     public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
@@ -80,17 +105,17 @@ public sealed class TriggerRestoreAction : ActionBase<TriggerRestoreSettings, Tr
         // - select: types that can be selected for restore (SupportsRestore)
         // - deploy: types permitted to deploy during restore, plus content files (PermittedToRestore)
         var restoreSelectTypes = new HashSet<string>(
-            DeployEntityTypes.GetEntityTypes(
+            _deployEntityTypesOptions.CurrentValue.GetEntityTypes(
                 _fileTypeCollection,
                 DeployEntityTypeCategories.Content,
                 _deploySettings,
-                detail => detail.Options.SupportsRestore));
+                options => options.SupportsRestore));
         var restoreDeployTypes = new HashSet<string>(
-            DeployEntityTypes.GetEntityTypes(
+            _deployEntityTypesOptions.CurrentValue.GetEntityTypes(
                 _fileTypeCollection,
                 DeployEntityTypeCategories.Content | DeployEntityTypeCategories.ContentFile,
                 _deploySettings,
-                detail => detail.Options.PermittedToRestore));
+                options => options.PermittedToRestore));
 
         var work = _workItemFactory.CreateTargetRestore(
             _currentEnvironment,

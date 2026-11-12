@@ -1,6 +1,8 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Cms.Core;
+using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Deploy;
 using Umbraco.Cms.Core.Hosting;
 using Umbraco.Deploy.Core.Configuration.DeployConfiguration;
@@ -31,7 +33,30 @@ public sealed class DeployContentAction : ActionBase<DeployContentSettings, Depl
     private readonly IHostingEnvironment _hostingEnvironment;
     private readonly IFileTypeCollection _fileTypeCollection;
     private readonly DeploySettings _deploySettings;
+    private readonly IOptionsMonitor<DeployEntityTypesOptions> _deployEntityTypesOptions;
 
+    [ActivatorUtilitiesConstructor]
+    public DeployContentAction(
+        ActionInfrastructure infrastructure,
+        CurrentEnvironment currentEnvironment,
+        IWorkItemFactory workItemFactory,
+        IExtractEnvironmentInfo environmentInfoExtractor,
+        IHostingEnvironment hostingEnvironment,
+        IFileTypeCollection fileTypeCollection,
+        IOptions<DeploySettings> deploySettings,
+        IOptionsMonitor<DeployEntityTypesOptions> deployEntityTypesOptions)
+        : base(infrastructure)
+    {
+        _deployEntityTypesOptions = deployEntityTypesOptions;
+        _currentEnvironment = currentEnvironment;
+        _workItemFactory = workItemFactory;
+        _environmentInfoExtractor = environmentInfoExtractor;
+        _hostingEnvironment = hostingEnvironment;
+        _fileTypeCollection = fileTypeCollection;
+        _deploySettings = deploySettings.Value;
+    }
+
+    [Obsolete("Use the constructor taking IOptionsMonitor<DeployEntityTypesOptions>. Will be removed in v21.0.0.")]
     public DeployContentAction(
         ActionInfrastructure infrastructure,
         CurrentEnvironment currentEnvironment,
@@ -40,14 +65,16 @@ public sealed class DeployContentAction : ActionBase<DeployContentSettings, Depl
         IHostingEnvironment hostingEnvironment,
         IFileTypeCollection fileTypeCollection,
         IOptions<DeploySettings> deploySettings)
-        : base(infrastructure)
+        : this(
+            infrastructure,
+            currentEnvironment,
+            workItemFactory,
+            environmentInfoExtractor,
+            hostingEnvironment,
+            fileTypeCollection,
+            deploySettings,
+            StaticServiceProvider.Instance.GetRequiredService<IOptionsMonitor<DeployEntityTypesOptions>>())
     {
-        _currentEnvironment = currentEnvironment;
-        _workItemFactory = workItemFactory;
-        _environmentInfoExtractor = environmentInfoExtractor;
-        _hostingEnvironment = hostingEnvironment;
-        _fileTypeCollection = fileTypeCollection;
-        _deploySettings = deploySettings.Value;
     }
 
     public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
@@ -70,11 +97,11 @@ public sealed class DeployContentAction : ActionBase<DeployContentSettings, Depl
 
         // Only entity types registered with queue-for-transfer support (and not excluded
         // by configuration) can be transferred, matching the backoffice behavior.
-        var transferEntityTypes = DeployEntityTypes.GetEntityTypes(
+        var transferEntityTypes = _deployEntityTypesOptions.CurrentValue.GetEntityTypes(
             _fileTypeCollection,
             DeployEntityTypeCategories.Content,
             _deploySettings,
-            detail => detail.Options.SupportsQueueForTransfer);
+            options => options.SupportsQueueForTransfer);
         if (!transferEntityTypes.Contains(udi.EntityType))
         {
             return Task.FromResult(ActionResult.Failed(
@@ -119,7 +146,7 @@ public sealed class DeployContentAction : ActionBase<DeployContentSettings, Depl
         // content files (e.g. media files) — the public equivalent of the internal set
         // Deploy itself passes when starting a backoffice transfer.
         ISet<string> deployEntityTypes = new HashSet<string>(
-            DeployEntityTypes.GetEntityTypes(_fileTypeCollection, DeployEntityTypeCategories.Content | DeployEntityTypeCategories.ContentFile));
+            _deployEntityTypesOptions.CurrentValue.GetEntityTypes(_fileTypeCollection, DeployEntityTypeCategories.Content | DeployEntityTypeCategories.ContentFile));
 
         var work = _workItemFactory.CreateSourceDeploy(
             _currentEnvironment,

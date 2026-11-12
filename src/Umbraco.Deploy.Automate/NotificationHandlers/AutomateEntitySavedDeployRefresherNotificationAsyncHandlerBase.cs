@@ -35,8 +35,6 @@ public abstract class AutomateEntitySavedDeployRefresherNotificationAsyncHandler
         _diskEntityService = diskEntityService;
         _signatureService = signatureService;
         _entityType = entityType;
-
-        diskEntityService.RegisterDiskEntityType(entityType);
     }
 
     /// <summary>
