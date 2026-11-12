@@ -6,6 +6,8 @@ using Umbraco.Cms.Core.Deploy;
 using Umbraco.Deploy.Automate.Artifacts;
 using Umbraco.Deploy.Automate.Configuration;
 using Umbraco.Deploy.Automate.Workspaces;
+using Umbraco.Cms.Core.Models;
+using Umbraco.Deploy.Core.Connectors.ServiceConnectors;
 
 namespace Umbraco.Deploy.Automate.Connectors.ServiceConnectors;
 
@@ -222,6 +224,88 @@ public class UmbracoAutomateWorkspaceGroupServiceConnector(
                 yield return new GuidUdi(DeployAutomateConstants.UdiEntityType.Automation, automation.Id);
             }
         }
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Below a group, its child groups then its automations. A group is never listed at the root: the picker starts at
+    /// the workspaces of the Automations tree. A filter searches every nested group and automation of the group; the
+    /// automation query cannot be limited to a set of groups, so the filtered level is paged in memory.
+    /// </remarks>
+    protected override async Task<PagedModel<TreeItem>> GetTreeLevelAsync(
+        GuidUdi? parentUdi,
+        string? filter,
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        if (parentUdi is null || parentUdi.EntityType != DeployAutomateConstants.UdiEntityType.WorkspaceGroup)
+        {
+            return new PagedModel<TreeItem>();
+        }
+
+        var group = await groupService.GetGroupAsync(parentUdi.Guid, cancellationToken);
+        if (group is null)
+        {
+            return new PagedModel<TreeItem>();
+        }
+
+        var workspaceIds = new HashSet<Guid> { group.WorkspaceId };
+
+        if (string.IsNullOrWhiteSpace(filter))
+        {
+            var childGroups = await groupService.GetGroupsByWorkspaceAsync(group.WorkspaceId, group.Id, cancellationToken);
+            var head = childGroups
+                .OrderBy(x => x.Name)
+                .Select(x => UmbracoAutomateTreeItems.ForGroup(x, parentUdi))
+                .ToList();
+
+            return await UmbracoAutomateTreeItems.PageWithTailAsync(
+                head,
+                async (tailSkip, tailTake, ct) =>
+                {
+                    var (automations, total) = await automationService.GetAutomationsPagedAsync(
+                        filter: null,
+                        workspaceIds: workspaceIds,
+                        groupId: group.Id,
+                        skip: tailSkip,
+                        take: tailTake,
+                        cancellationToken: ct);
+
+                    return (automations.Select(x => UmbracoAutomateTreeItems.ForAutomation(x, parentUdi)).ToList(), total);
+                },
+                skip,
+                take,
+                cancellationToken);
+        }
+
+        var allGroups = (await groupService.GetAllGroupsAsync(cancellationToken))
+            .Where(x => x.WorkspaceId == group.WorkspaceId)
+            .ToList();
+        var descendantGroupIds = CollectDescendantGroupIds(group.Id, allGroups);
+        var scopeGroupIds = new HashSet<Guid>(descendantGroupIds) { group.Id };
+
+        var matchingGroups = allGroups
+            .Where(x => descendantGroupIds.Contains(x.Id) && UmbracoAutomateTreeItems.Matches(x.Name, filter))
+            .OrderBy(x => x.Name)
+            .Select(x => UmbracoAutomateTreeItems.ForGroup(x, parentUdi));
+
+        var (matchingAutomations, _) = await automationService.GetAutomationsPagedAsync(
+            filter: filter,
+            workspaceIds: workspaceIds,
+            groupId: null,
+            skip: 0,
+            take: int.MaxValue,
+            cancellationToken: cancellationToken);
+
+        var items = matchingGroups
+            .Concat(matchingAutomations
+                .Where(x => x.GroupId.HasValue && scopeGroupIds.Contains(x.GroupId.Value))
+                .OrderBy(x => x.Name)
+                .Select(x => UmbracoAutomateTreeItems.ForAutomation(x, parentUdi)))
+            .ToList();
+
+        return UmbracoAutomateTreeItems.Page(items, skip, take);
     }
 
     private static List<Guid> CollectDescendantGroupIds(Guid rootId, IReadOnlyCollection<WorkspaceGroup> allGroups)

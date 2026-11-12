@@ -1,5 +1,4 @@
 using Umbraco.Cms.Core.Composing;
-using Umbraco.Deploy.Automate.Tree;
 using Umbraco.Deploy.Infrastructure.Disk;
 using Umbraco.Deploy.Infrastructure.Transfer;
 
@@ -49,12 +48,7 @@ public class DeployAutomateComponent(
                 PermittedToRestore = true,
                 SupportsPartialRestore = true,
                 SupportsImportExport = true,
-            },
-            null,
-            new DeployTransferRegisteredEntityTypeDetail.RemoteTreeDetail(
-                UmbracoAutomateTreeHelper.GetWorkspaceTree,
-                "Automate workspaces",
-                DeployAutomateConstants.UdiEntityType.Workspace));
+            });
 
         transferEntityService.RegisterTransferEntityType(
             DeployAutomateConstants.UdiEntityType.WorkspaceGroup,
@@ -66,12 +60,7 @@ public class DeployAutomateComponent(
                 PermittedToRestore = true,
                 SupportsPartialRestore = true,
                 SupportsImportExport = true,
-            },
-            null,
-            new DeployTransferRegisteredEntityTypeDetail.RemoteTreeDetail(
-                UmbracoAutomateTreeHelper.GetAutomationTree,
-                "Automate folders",
-                DeployAutomateConstants.UdiEntityType.WorkspaceGroup));
+            });
 
         transferEntityService.RegisterTransferEntityType(
             DeployAutomateConstants.UdiEntityType.Automation,
@@ -82,12 +71,7 @@ public class DeployAutomateComponent(
                 PermittedToRestore = true,
                 SupportsPartialRestore = true,
                 SupportsImportExport = true,
-            },
-            null,
-            new DeployTransferRegisteredEntityTypeDetail.RemoteTreeDetail(
-                UmbracoAutomateTreeHelper.GetAutomationTree,
-                "Automations",
-                DeployAutomateConstants.UdiEntityType.Automation));
+            });
 
         transferEntityService.RegisterTransferEntityType(
             DeployAutomateConstants.UdiEntityType.Connection,
@@ -98,11 +82,6 @@ public class DeployAutomateComponent(
                 PermittedToRestore = true,
                 SupportsPartialRestore = true,
                 SupportsImportExport = true,
-            },
-            null,
-            new DeployTransferRegisteredEntityTypeDetail.RemoteTreeDetail(
-                UmbracoAutomateTreeHelper.GetConnectionTree,
-                "Automate connections",
-                DeployAutomateConstants.UdiEntityType.Connection));
+            });
     }
 }

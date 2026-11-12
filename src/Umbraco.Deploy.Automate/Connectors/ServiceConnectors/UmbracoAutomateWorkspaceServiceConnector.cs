@@ -7,6 +7,8 @@ using Umbraco.Cms.Core.Deploy;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Deploy.Automate.Artifacts;
 using Umbraco.Deploy.Automate.Configuration;
+using Umbraco.Cms.Core.Models;
+using Umbraco.Deploy.Core.Connectors.ServiceConnectors;
 
 namespace Umbraco.Deploy.Automate.Connectors.ServiceConnectors;
 
@@ -234,5 +236,67 @@ public class UmbracoAutomateWorkspaceServiceConnector(
         {
             yield return new GuidUdi(DeployAutomateConstants.UdiEntityType.Automation, automation.Id);
         }
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// At the root (the Workspaces tree) a flat list of workspaces. Below a workspace (the Automations tree) its
+    /// root-level groups, then its root-level automations. A filter searches every group and automation in the workspace.
+    /// </remarks>
+    protected override async Task<PagedModel<TreeItem>> GetTreeLevelAsync(
+        GuidUdi? parentUdi,
+        string? filter,
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        if (parentUdi is null)
+        {
+            var workspaces = await workspaceService.GetAllWorkspacesAsync(cancellationToken);
+            var workspaceItems = workspaces
+                .Where(x => UmbracoAutomateTreeItems.Matches(x.Name, filter))
+                .OrderBy(x => x.Name)
+                .Select(x => UmbracoAutomateTreeItems.ForWorkspace(x, false, null))
+                .ToList();
+
+            return UmbracoAutomateTreeItems.Page(workspaceItems, skip, take);
+        }
+
+        if (parentUdi.EntityType != DeployAutomateConstants.UdiEntityType.Workspace)
+        {
+            return new PagedModel<TreeItem>();
+        }
+
+        var workspaceId = parentUdi.Guid;
+        var hasFilter = !string.IsNullOrWhiteSpace(filter);
+
+        IEnumerable<WorkspaceGroup> groups = hasFilter
+            ? (await groupService.GetAllGroupsAsync(cancellationToken))
+                .Where(x => x.WorkspaceId == workspaceId && UmbracoAutomateTreeItems.Matches(x.Name, filter))
+            : await groupService.GetGroupsByWorkspaceAsync(workspaceId, null, cancellationToken);
+
+        var head = groups
+            .OrderBy(x => x.Name)
+            .Select(x => UmbracoAutomateTreeItems.ForGroup(x, parentUdi))
+            .ToList();
+
+        // Guid.Empty is the root-level (ungrouped) automations; null searches the whole workspace.
+        return await UmbracoAutomateTreeItems.PageWithTailAsync(
+            head,
+            async (tailSkip, tailTake, ct) =>
+            {
+                var (automations, total) = await automationService.GetAutomationsPagedAsync(
+                    filter: hasFilter ? filter : null,
+                    workspaceIds: new HashSet<Guid> { workspaceId },
+                    groupId: hasFilter ? null : Guid.Empty,
+                    skip: tailSkip,
+                    take: tailTake,
+                    cancellationToken: ct);
+
+                return (automations.Select(x => UmbracoAutomateTreeItems.ForAutomation(x, parentUdi)).ToList(), total);
+            },
+            skip,
+            take,
+            cancellationToken);
     }
 }

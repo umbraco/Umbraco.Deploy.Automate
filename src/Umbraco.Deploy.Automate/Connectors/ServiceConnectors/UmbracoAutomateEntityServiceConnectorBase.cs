@@ -2,8 +2,10 @@ using System.Runtime.CompilerServices;
 using Umbraco.Automate.Core.Models;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Deploy;
+using Umbraco.Cms.Core.Models;
 using Umbraco.Deploy.Automate.Configuration;
 using Umbraco.Deploy.Automate.Extensions;
+using Umbraco.Deploy.Core.Connectors.ServiceConnectors;
 using Umbraco.Deploy.Infrastructure.Artifacts;
 using Umbraco.Deploy.Infrastructure.Connectors.ServiceConnectors;
 
@@ -15,7 +17,7 @@ namespace Umbraco.Deploy.Automate.Connectors.ServiceConnectors;
 /// </summary>
 public abstract class UmbracoAutomateEntityServiceConnectorBase<TArtifact, TEntity>(
     DeployAutomateSettingsAccessor settingsAccessor)
-    : ServiceConnectorBase<TArtifact, GuidUdi, TEntity>
+    : ServiceConnectorBase<TArtifact, GuidUdi, TEntity>, ITreeServiceConnector
     where TArtifact : DeployArtifactBase<GuidUdi>
     where TEntity : IAutomateEntity
 {
@@ -71,6 +73,41 @@ public abstract class UmbracoAutomateEntityServiceConnectorBase<TArtifact, TEnti
         TEntity? entity = await GetEntityAsync(udi.Guid, cancellationToken).ConfigureAwait(false);
         return entity == null ? null : await GetArtifactAsync(udi, entity, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <inheritdoc />
+    public async Task<PagedModel<TreeItem>> GetTreeItemsAsync(
+        Udi? parentUdi = null,
+        string? filter = null,
+        int skip = 0,
+        int take = int.MaxValue,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(skip);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(take);
+
+        if (parentUdi is null || parentUdi.IsRoot)
+        {
+            return await GetTreeLevelAsync(null, filter, skip, take, cancellationToken).ConfigureAwait(false);
+        }
+
+        // Deploy lists a level with the connector of the parent's entity type, so anything but a GUID UDI is not ours.
+        return parentUdi is GuidUdi guidParent
+            ? await GetTreeLevelAsync(guidParent, filter, skip, take, cancellationToken).ConfigureAwait(false)
+            : new PagedModel<TreeItem>();
+    }
+
+    /// <summary>
+    /// Lists one tree level for Deploy's partial-restore picker. The arguments are already validated, and
+    /// <paramref name="parentUdi"/> is <c>null</c> for the root. An implementation returns nothing for a parent
+    /// of an entity type it does not list, rather than falling back to its root. Defaults to an empty level.
+    /// </summary>
+    protected virtual Task<PagedModel<TreeItem>> GetTreeLevelAsync(
+        GuidUdi? parentUdi,
+        string? filter,
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+        => Task.FromResult(new PagedModel<TreeItem>());
 
     /// <inheritdoc />
     public override async Task<NamedUdiRange> GetRangeAsync(
