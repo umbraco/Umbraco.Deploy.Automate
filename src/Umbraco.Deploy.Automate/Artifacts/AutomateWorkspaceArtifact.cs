@@ -11,13 +11,14 @@ public class AutomateWorkspaceArtifact(GuidUdi udi, IEnumerable<ArtifactDependen
     : DeployArtifactBase<GuidUdi>(udi, dependencies)
 {
     /// <summary>
-    /// The service account key (UserKind.Api user) tied to this workspace on the source
-    /// environment. Kept on the artifact for reference/debugging only — Umbraco Deploy does
-    /// not transfer <c>IUser</c> entities across environments, so this key generally does not
-    /// resolve to a real user on the target and is deliberately NOT applied on import (see
-    /// <c>UmbracoAutomateWorkspaceServiceConnector.Pass3Async</c>). An admin must configure a
-    /// working service account per environment.
+    /// The service account key (UserKind.Api user) of the workspace on the source environment.
+    /// No longer exported: the service account is environment-specific, and exporting it made
+    /// the workspace checksum differ between environments, which broke every transfer of an
+    /// automation or group that depends on the workspace. Never applied on import either. The
+    /// property remains so older artifacts that carry it still deserialize.
     /// </summary>
+    [Obsolete("Not exported: the service account is environment-specific. Will be removed in v21.0.0.")]
+
     public Guid ServiceAccountKey { get; set; }
 
     /// <summary>

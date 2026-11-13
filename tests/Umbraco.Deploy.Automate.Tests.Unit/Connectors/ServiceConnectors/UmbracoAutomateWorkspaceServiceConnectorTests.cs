@@ -1,3 +1,6 @@
+// ServiceAccountKey on the artifact is obsolete (no longer exported); these tests set it on purpose to
+// prove old artifacts that still carry it deserialize and are never applied.
+#pragma warning disable CS0618
 using Umbraco.Automate.Core.Automations;
 using Umbraco.Automate.Core.Connections;
 using Umbraco.Automate.Core.Workspaces;
@@ -8,6 +11,7 @@ using Umbraco.Cms.Core.Services;
 using Umbraco.Deploy.Automate.Artifacts;
 using Umbraco.Deploy.Automate.Configuration;
 using Umbraco.Deploy.Automate.Connectors.ServiceConnectors;
+using Umbraco.Deploy.Infrastructure.Serialization;
 
 namespace Umbraco.Deploy.Automate.Tests.Unit.Connectors.ServiceConnectors;
 
@@ -59,7 +63,62 @@ public class UmbracoAutomateWorkspaceServiceConnectorTests
         artifact.ShouldNotBeNull();
         artifact.Alias.ShouldBe("marketing");
         artifact.Name.ShouldBe("Marketing");
-        artifact.ServiceAccountKey.ShouldBe(serviceAccountKey);
+    }
+
+    [Fact]
+    public async Task GetArtifactAsync_WorkspacesDifferingOnlyInServiceAccountKey_HaveTheSameChecksum()
+    {
+        // The service account is environment-specific and never applied on import, so it must not
+        // be part of the checksum: automations and groups depend on their workspace with Match,
+        // and a checksum that can never agree between environments fails every transfer.
+        var workspaceA = BuildWorkspace(serviceAccountKey: Guid.NewGuid());
+        var workspaceB = BuildWorkspace(serviceAccountKey: Guid.NewGuid());
+        workspaceB.Id = workspaceA.Id;
+        var udi = new GuidUdi(DeployAutomateConstants.UdiEntityType.Workspace, workspaceA.Id);
+
+        var artifactA = await _connector.GetArtifactAsync(udi, workspaceA);
+        var artifactB = await _connector.GetArtifactAsync(udi, workspaceB);
+
+        artifactA.ShouldNotBeNull();
+        artifactB.ShouldNotBeNull();
+        artifactA.Checksum.ShouldBe(artifactB.Checksum);
+        ArtifactJsonConvert.SerializeObject(artifactA).ShouldBe(ArtifactJsonConvert.SerializeObject(artifactB));
+        ArtifactJsonConvert.SerializeObject(artifactA).ShouldNotContain("ServiceAccountKey");
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WithArtifactJsonFromBeforeTheChange_DeserializesAndDoesNotApplyServiceAccountKey()
+    {
+        // Older exports carry ServiceAccountKey; they must still read, and the key must be ignored.
+        var udi = new GuidUdi(DeployAutomateConstants.UdiEntityType.Workspace, Guid.NewGuid());
+        UdiParser.RegisterUdiType(DeployAutomateConstants.UdiEntityType.Workspace, UdiType.GuidUdi);
+        var oldKey = Guid.NewGuid();
+        var oldArtifact = new AutomateWorkspaceArtifact(udi, new ArtifactDependencyCollection())
+        {
+            Alias = "marketing",
+            Name = "Marketing",
+            ServiceAccountKey = oldKey,
+        };
+        var json = ArtifactJsonConvert.SerializeObject(oldArtifact);
+        json.ShouldContain("ServiceAccountKey");
+
+        var artifact = ArtifactJsonConvert.DeserializeObject(json) as AutomateWorkspaceArtifact;
+
+        artifact.ShouldNotBeNull();
+        artifact.ServiceAccountKey.ShouldBe(oldKey);
+        var state = ArtifactDeployState.Create<AutomateWorkspaceArtifact, Workspace>(artifact, null, _connector, 3);
+        _workspaceServiceMock
+            .Setup(x => x.CreateWorkspaceAsync(It.IsAny<Workspace>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Workspace w, Guid? _, CancellationToken _) => w);
+
+        await _connector.ProcessAsync(state, Mock.Of<IDeployContext>(), 3);
+
+        _workspaceServiceMock.Verify(
+            x => x.CreateWorkspaceAsync(
+                It.Is<Workspace>(w => w.ServiceAccountKey == Guid.Empty),
+                It.IsAny<Guid?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
