@@ -17,6 +17,7 @@ public class UmbracoAutomateWorkspaceGroupServiceConnectorTreeTests
 
     public UmbracoAutomateWorkspaceGroupServiceConnectorTreeTests()
     {
+        AutomateUdiTypes.Register();
         var settingsAccessorMock = new Mock<DeployAutomateSettingsAccessor>(MockBehavior.Strict, null!);
         settingsAccessorMock.Setup(x => x.Settings).Returns(new DeployAutomateSettings());
 
