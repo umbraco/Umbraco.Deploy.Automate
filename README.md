@@ -26,7 +26,7 @@ dotnet add package Umbraco.Deploy.Automate
 |---|---|
 | .NET | 10 |
 | Umbraco CMS | 17.x |
-| Umbraco Deploy | 17.x |
+| Umbraco Deploy | 17.4+ |
 | Umbraco Automate | 17.0+ |
 
 ---
@@ -275,13 +275,12 @@ src/
     Actions/                          # Automate actions that call Deploy operations
     Artifacts/                        # Deploy artifacts for Automate entities
     Configuration/                    # DeployAutomateSettings
-    Connectors/ServiceConnectors/     # One service connector per Automate entity
+    Connectors/ServiceConnectors/     # One service connector per Automate entity (also lists its partial-restore tree level)
     NotificationHandlers/             # Cache refresh handlers for save/delete
     Triggers/                         # Automate triggers backed by Deploy notifications
     Triggers/Outputs/                 # Trigger output types
-    Tree/                             # Back-office tree helpers for Deploy dialogs
     Workspaces/                       # WorkspaceGroupDeploySaver (bypasses domain validation)
-    DeployAutomateComponent.cs        # Registers UDI, disk, and transfer entity types
+    DeployAutomateComponent.cs        # Registers disk and transfer entity types
     DeployAutomateComposer.cs         # DI composition
 tests/
   Umbraco.Deploy.Automate.Tests.Unit/

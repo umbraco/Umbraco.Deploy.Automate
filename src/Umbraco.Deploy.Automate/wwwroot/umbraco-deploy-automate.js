@@ -14,6 +14,7 @@ const UA_AUTOMATION_GROUP_ENTITY_TYPE = "ua:automation-group";
 const UA_SERVER_WORKSPACE_ENTITY_TYPE = "umbraco-automate-workspace";
 const UA_SERVER_WORKSPACE_GROUP_ENTITY_TYPE = "umbraco-automate-workspace-group";
 const UA_SERVER_AUTOMATION_ENTITY_TYPE = "umbraco-automate-automation";
+const UA_SERVER_CONNECTION_ENTITY_TYPE = "umbraco-automate-connection";
 
 export const onInit = async (host, extensionRegistry) => {
   extensionRegistry.registerMany([
@@ -28,10 +29,13 @@ export const onInit = async (host, extensionRegistry) => {
           // Keys are Deploy's server-side UDI entity types — that's what
           // Deploy passes to `deploy_entityTypes_<entityType>` when resolving
           // labels in dialogs (e.g. "This will put all <name> items in the queue").
+          // Singular, sentence case like Deploy's own values: the partial restore
+          // picker lowercases it into "Select <name> to restore".
           deploy_entityTypes: {
-            [UA_SERVER_WORKSPACE_ENTITY_TYPE]: "Automation",
+            [UA_SERVER_WORKSPACE_ENTITY_TYPE]: "Automation workspace",
             [UA_SERVER_WORKSPACE_GROUP_ENTITY_TYPE]: "Automation folder",
             [UA_SERVER_AUTOMATION_ENTITY_TYPE]: "Automation",
+            [UA_SERVER_CONNECTION_ENTITY_TYPE]: "Automation connection",
           },
         },
       },
