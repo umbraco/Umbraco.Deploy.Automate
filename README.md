@@ -8,7 +8,7 @@ The integration package between [Umbraco Deploy](https://umbraco.com/products/um
 
 This package does three things:
 
-1. **Transfers Automate entities through Deploy** — workspaces, workspace groups, automations, and connections move between environments using the same Queue / Restore / Partial Restore flows you already use for content and schema.
+1. **Moves Automate entities between environments with Deploy** — automations and their folders (workspace groups) use the Add to Transfer Queue, Tree restore and Partial restore flows you already use for content. Workspaces and connections are deployed with the schema.
 2. **Exposes Deploy events as Automate triggers** — build automation flows that react to deployment activity (task completed/failed, artifact exported/imported, files written/deleted, and more).
 3. **Exposes Deploy operations as Automate actions** — call Deploy from an automation step to deploy content, queue items for transfer, or trigger a restore.
 
@@ -28,25 +28,44 @@ Version 18 installs without the flag: `dotnet add package Umbraco.Deploy.Automat
 
 | Dependency | Version |
 |---|---|
-| .NET | 10 |
-| Umbraco CMS | 18.x |
-| Umbraco Deploy | 18.2+ |
-| Umbraco Automate | 18.0+ |
+| .NET | 11 |
+| Umbraco CMS | 19 |
+| Umbraco Deploy | 19 |
+| Umbraco Automate | 19 |
+
+### Upgrading from version 18
+
+**Important:** automations and folders no longer write `.uda` files, and Deploy 19 ignores the ones you already have. Do these steps in order:
+
+1. Before upgrading, get automations and folders in sync across your environments.
+2. Upgrade.
+3. Delete the `umbraco-automate-automation__<guid>.uda` and `umbraco-automate-workspace-group__<guid>.uda` files from `umbraco/Deploy/Revision`. Keep the `umbraco-automate-workspace__<guid>.uda` and `umbraco-automate-connection__<guid>.uda` files. Don't delete by a `umbraco-automate-workspace*` pattern, as it also matches the workspace files.
+4. Move automations and folders from now on with **Add to Transfer Queue**, **Tree restore** or **Partial restore**.
+
+Also:
+
+- Workspaces and connections no longer show Add to Transfer Queue, Tree restore or Partial restore. They are written as `.uda` files and deployed with the schema.
+- Deploy 19's UDA file health check lists the workspace and connection `.uda` files that Deploy 18 wrote, until you export the schema again.
 
 ---
 
 ## Part 1 — Deploying Automate entities
 
-The package registers Deploy service connectors for the four user-defined Automate entities, so each one appears in the Deploy back-office tree alongside content and schema. Queue for Transfer, Restore, and Partial Restore all work as expected.
+The package registers Deploy service connectors for the four user-defined Automate entities, so each one appears in the Deploy back-office tree alongside content and schema. The entities move in one of two ways:
+
+- **Transfer** (automations and workspace groups): use Add to Transfer Queue, Tree restore and Partial restore, like content. These actions are on the Automations tree. Partial restore from the header shows your workspaces. Open one and pick a folder or automation, not the workspace itself. Tree restore is on the Automations header only.
+- **Disk only** (workspaces and connections): saving one writes its `.uda` file; commit it and deploy it with the schema. They have no transfer or restore actions.
+
+Deploy the schema (workspaces and connections) before you transfer automations. Otherwise the import fails with "Ensure the workspace is deployed before the automation".
 
 ### Supported entities
 
 | Entity | UDI entity type | Notes |
 |---|---|---|
-| Workspace | `umbraco-automate-workspace` | Includes service account key, user-group assignments, and allowed-connection list. |
-| Workspace Group | `umbraco-automate-workspace-group` | Folder hierarchy; nested groups are reparented in a second pass after every group exists on the target. |
-| Automation | `umbraco-automate-automation` | Full trigger / steps / step-connections / notification-settings graph, including conditions and canvas state. |
-| Connection | `umbraco-automate-connection` | Type alias plus the settings dictionary, with sensitive-value filtering (see below). |
+| Workspace (disk) | `umbraco-automate-workspace` | Includes service account key, user-group assignments, and allowed-connection list. |
+| Workspace Group (transfer) | `umbraco-automate-workspace-group` | Folder hierarchy; nested groups are reparented in a second pass after every group exists on the target. |
+| Automation (transfer) | `umbraco-automate-automation` | Full trigger / steps / step-connections / notification-settings graph, including conditions and canvas state. |
+| Connection (disk) | `umbraco-automate-connection` | Type alias plus the settings dictionary, with sensitive-value filtering (see below). |
 
 Runtime entities (`AutomationRun`, `StepRun`) are intentionally not transferable — execution history is per-environment.
 
@@ -236,9 +255,9 @@ Run Deploy operations from an Automate flow.
 
 | Action | What it does |
 |---|---|
-| Deploy Content | Starts a deploy of the specified content to a target environment |
+| Deploy Content | Starts a deploy of the specified content to a target environment. It refuses the Baseline environment (Deploy's Baseline workspace) as a target, because Baseline can only be restored from. |
 | Add To Queue | Adds a content item to a backoffice user's Deploy transfer queue |
-| Trigger Restore | Pulls and restores all deployable content from a source environment |
+| Trigger Restore | Pulls and restores all deployable content from a source environment. Enter the source environment's URL as it's set up in Deploy, for example `https://live.mysite.com`. The scheme, host and port must match. Don't add a path such as `/umbraco`: it's kept, and the restore fails. A query string or fragment is dropped. |
 
 ---
 
@@ -284,8 +303,7 @@ src/
     Triggers/                         # Automate triggers backed by Deploy notifications
     Triggers/Outputs/                 # Trigger output types
     Workspaces/                       # WorkspaceGroupDeploySaver (bypasses domain validation)
-    DeployAutomateComponent.cs        # Registers disk and transfer entity types
-    DeployAutomateComposer.cs         # DI composition
+    DeployAutomateComposer.cs         # DI composition; ConfigureEntityTypes registers the disk and transfer entity types
 tests/
   Umbraco.Deploy.Automate.Tests.Unit/
 ```
