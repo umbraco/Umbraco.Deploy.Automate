@@ -14,9 +14,13 @@ This package does three things:
 
 ## Installation
 
+Version 19 is a pre-release (labelled `-rcN`) while Umbraco CMS 19 is in pre-release. It is on nuget.org, so there is no feed to add. Install it with `--prerelease`:
+
 ```bash
-dotnet add package Umbraco.Deploy.Automate
+dotnet add package Umbraco.Deploy.Automate --prerelease
 ```
+
+Version 18 installs without the flag: `dotnet add package Umbraco.Deploy.Automate`.
 
 `DeployAutomateComposer` is auto-discovered by Umbraco's composition system; no manual registration is required.
 
