@@ -232,7 +232,7 @@ Run Deploy operations from an Automate flow.
 
 | Action | What it does |
 |---|---|
-| Deploy Content | Starts a deploy of the specified content to a target environment |
+| Deploy Content | Starts a deploy of the specified content to a target environment. It refuses the Baseline environment (Deploy's Baseline workspace) as a target, because Baseline can only be restored from |
 | Add To Queue | Adds a content item to a backoffice user's Deploy transfer queue |
 | Trigger Restore | Pulls and restores all deployable content from a source environment |
 
