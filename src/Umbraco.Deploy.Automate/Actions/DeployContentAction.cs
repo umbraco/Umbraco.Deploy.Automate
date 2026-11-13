@@ -1,8 +1,12 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Cms.Core;
+using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Deploy;
 using Umbraco.Cms.Core.Hosting;
+using Umbraco.Deploy.Automate.Extensions;
+using Umbraco.Deploy.Core.Configuration;
 using Umbraco.Deploy.Core.Configuration.DeployConfiguration;
 using Umbraco.Deploy.Core.Environments;
 using Umbraco.Deploy.Core.Exceptions;
@@ -31,7 +35,30 @@ public sealed class DeployContentAction : ActionBase<DeployContentSettings, Depl
     private readonly IHostingEnvironment _hostingEnvironment;
     private readonly IFileTypeCollection _fileTypeCollection;
     private readonly DeploySettings _deploySettings;
+    private readonly IWorkspaces _workspaces;
 
+    [ActivatorUtilitiesConstructor]
+    public DeployContentAction(
+        ActionInfrastructure infrastructure,
+        CurrentEnvironment currentEnvironment,
+        IWorkItemFactory workItemFactory,
+        IExtractEnvironmentInfo environmentInfoExtractor,
+        IHostingEnvironment hostingEnvironment,
+        IFileTypeCollection fileTypeCollection,
+        IOptions<DeploySettings> deploySettings,
+        IWorkspaces workspaces)
+        : base(infrastructure)
+    {
+        _workspaces = workspaces;
+        _currentEnvironment = currentEnvironment;
+        _workItemFactory = workItemFactory;
+        _environmentInfoExtractor = environmentInfoExtractor;
+        _hostingEnvironment = hostingEnvironment;
+        _fileTypeCollection = fileTypeCollection;
+        _deploySettings = deploySettings.Value;
+    }
+
+    [Obsolete("Use the constructor taking IWorkspaces. Will be removed in v20.0.0.")]
     public DeployContentAction(
         ActionInfrastructure infrastructure,
         CurrentEnvironment currentEnvironment,
@@ -40,14 +67,16 @@ public sealed class DeployContentAction : ActionBase<DeployContentSettings, Depl
         IHostingEnvironment hostingEnvironment,
         IFileTypeCollection fileTypeCollection,
         IOptions<DeploySettings> deploySettings)
-        : base(infrastructure)
+        : this(
+            infrastructure,
+            currentEnvironment,
+            workItemFactory,
+            environmentInfoExtractor,
+            hostingEnvironment,
+            fileTypeCollection,
+            deploySettings,
+            StaticServiceProvider.Instance.GetRequiredService<IWorkspaces>())
     {
-        _currentEnvironment = currentEnvironment;
-        _workItemFactory = workItemFactory;
-        _environmentInfoExtractor = environmentInfoExtractor;
-        _hostingEnvironment = hostingEnvironment;
-        _fileTypeCollection = fileTypeCollection;
-        _deploySettings = deploySettings.Value;
     }
 
     public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
@@ -102,6 +131,14 @@ public sealed class DeployContentAction : ActionBase<DeployContentSettings, Depl
         {
             return Task.FromResult(ActionResult.Failed(
                 new InvalidOperationException($"Could not resolve target environment from '{settings.TargetUrl}'. Verify it is a configured Deploy environment."),
+                StepRunErrorCategory.Validation));
+        }
+
+        // The Baseline workspace can only be restored from, so Deploy rejects it as a target too
+        if (_workspaces.IsBaseline(targetEnvironment))
+        {
+            return Task.FromResult(ActionResult.Failed(
+                new InvalidOperationException($"'{settings.TargetUrl}' is the Baseline workspace, which can only be restored from."),
                 StepRunErrorCategory.Validation));
         }
 
