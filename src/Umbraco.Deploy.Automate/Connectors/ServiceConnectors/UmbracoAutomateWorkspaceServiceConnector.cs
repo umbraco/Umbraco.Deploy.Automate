@@ -94,7 +94,6 @@ public class UmbracoAutomateWorkspaceServiceConnector(
         {
             Alias = entity.Alias,
             Name = entity.Name,
-            ServiceAccountKey = entity.ServiceAccountKey,
             UserGroups = entity.UserGroups.ToList(),
             AllowedConnectionUdis = connectionUdis,
         };

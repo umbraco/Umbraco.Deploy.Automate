@@ -8,6 +8,7 @@ using Umbraco.Cms.Core.Services;
 using Umbraco.Deploy.Automate.Artifacts;
 using Umbraco.Deploy.Automate.Configuration;
 using Umbraco.Deploy.Automate.Connectors.ServiceConnectors;
+using Umbraco.Deploy.Infrastructure.Serialization;
 
 namespace Umbraco.Deploy.Automate.Tests.Unit.Connectors.ServiceConnectors;
 
@@ -23,6 +24,8 @@ public class UmbracoAutomateWorkspaceServiceConnectorTests
 
     public UmbracoAutomateWorkspaceServiceConnectorTests()
     {
+        AutomateUdiTypes.Register();
+
         _settingsAccessorMock = new Mock<DeployAutomateSettingsAccessor>(MockBehavior.Strict, null!);
         _settingsAccessorMock.Setup(x => x.Settings).Returns(new DeployAutomateSettings());
 
@@ -50,8 +53,7 @@ public class UmbracoAutomateWorkspaceServiceConnectorTests
     [Fact]
     public async Task GetArtifactAsync_CopiesCoreFields()
     {
-        var serviceAccountKey = Guid.NewGuid();
-        var workspace = BuildWorkspace(serviceAccountKey: serviceAccountKey);
+        var workspace = BuildWorkspace();
         var udi = new GuidUdi(DeployAutomateConstants.UdiEntityType.Workspace, workspace.Id);
 
         var artifact = await _connector.GetArtifactAsync(udi, workspace);
@@ -59,7 +61,65 @@ public class UmbracoAutomateWorkspaceServiceConnectorTests
         artifact.ShouldNotBeNull();
         artifact.Alias.ShouldBe("marketing");
         artifact.Name.ShouldBe("Marketing");
-        artifact.ServiceAccountKey.ShouldBe(serviceAccountKey);
+    }
+
+    [Fact]
+    public async Task GetArtifactAsync_WorkspacesDifferingOnlyInServiceAccountKey_HaveTheSameChecksum()
+    {
+        // The service account is environment-specific and never applied on import, so it must not
+        // be part of the checksum: automations and groups depend on their workspace with Match,
+        // and a checksum that can never agree between environments fails every transfer.
+        var workspaceA = BuildWorkspace(serviceAccountKey: Guid.NewGuid());
+        var workspaceB = BuildWorkspace(serviceAccountKey: Guid.NewGuid());
+        workspaceB.Id = workspaceA.Id;
+        var udi = new GuidUdi(DeployAutomateConstants.UdiEntityType.Workspace, workspaceA.Id);
+
+        var artifactA = await _connector.GetArtifactAsync(udi, workspaceA);
+        var artifactB = await _connector.GetArtifactAsync(udi, workspaceB);
+
+        artifactA.ShouldNotBeNull();
+        artifactB.ShouldNotBeNull();
+        artifactA.Checksum.ShouldBe(artifactB.Checksum);
+        ArtifactJsonConvert.SerializeObject(artifactA).ShouldBe(ArtifactJsonConvert.SerializeObject(artifactB));
+        ArtifactJsonConvert.SerializeObject(artifactA).ShouldNotContain("ServiceAccountKey");
+    }
+
+    [Fact]
+    public async Task ProcessAsync_WithArtifactJsonFromBeforeTheChange_DeserializesAndDoesNotApplyServiceAccountKey()
+    {
+        // Older exports carry ServiceAccountKey; they must still read, and the key must be ignored.
+        var udi = new GuidUdi(DeployAutomateConstants.UdiEntityType.Workspace, Guid.NewGuid());
+        var oldKey = Guid.NewGuid();
+#pragma warning disable CS0618 // ServiceAccountKey is obsolete; set on purpose to build an old-format artifact
+        var oldArtifact = new AutomateWorkspaceArtifact(udi, new ArtifactDependencyCollection())
+        {
+            Alias = "marketing",
+            Name = "Marketing",
+            ServiceAccountKey = oldKey,
+        };
+#pragma warning restore CS0618
+        var json = ArtifactJsonConvert.SerializeObject(oldArtifact);
+        json.ShouldContain("ServiceAccountKey");
+
+        var artifact = ArtifactJsonConvert.DeserializeObject(json) as AutomateWorkspaceArtifact;
+
+        artifact.ShouldNotBeNull();
+#pragma warning disable CS0618 // reading the obsolete property to prove it still deserializes
+        artifact.ServiceAccountKey.ShouldBe(oldKey);
+#pragma warning restore CS0618
+        var state = ArtifactDeployState.Create<AutomateWorkspaceArtifact, Workspace>(artifact, null, _connector, 3);
+        _workspaceServiceMock
+            .Setup(x => x.CreateWorkspaceAsync(It.IsAny<Workspace>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Workspace w, Guid? _, CancellationToken _) => w);
+
+        await _connector.ProcessAsync(state, Mock.Of<IDeployContext>(), 3);
+
+        _workspaceServiceMock.Verify(
+            x => x.CreateWorkspaceAsync(
+                It.Is<Workspace>(w => w.ServiceAccountKey == Guid.Empty),
+                It.IsAny<Guid?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
@@ -178,12 +238,14 @@ public class UmbracoAutomateWorkspaceServiceConnectorTests
         var existingServiceAccountKey = Guid.NewGuid();
         var workspace = BuildWorkspace(serviceAccountKey: existingServiceAccountKey);
         var udi = new GuidUdi(DeployAutomateConstants.UdiEntityType.Workspace, workspace.Id);
+#pragma warning disable CS0618 // ServiceAccountKey is obsolete; old artifacts still carry it
         var artifact = new AutomateWorkspaceArtifact(udi, new ArtifactDependencyCollection())
         {
             Alias = "marketing",
             Name = "Marketing",
             ServiceAccountKey = Guid.NewGuid(), // the source environment's key — must be ignored
         };
+#pragma warning restore CS0618
         var state = ArtifactDeployState.Create<AutomateWorkspaceArtifact, Workspace>(artifact, workspace, _connector, 3);
         _workspaceServiceMock
             .Setup(x => x.UpdateWorkspaceAsync(It.IsAny<Workspace>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
@@ -205,12 +267,14 @@ public class UmbracoAutomateWorkspaceServiceConnectorTests
         // On first deploy there is nothing configured locally yet — leave the field unset
         // rather than seeding it with the source environment's (almost certainly wrong) key.
         var udi = new GuidUdi(DeployAutomateConstants.UdiEntityType.Workspace, Guid.NewGuid());
+#pragma warning disable CS0618 // ServiceAccountKey is obsolete; old artifacts still carry it
         var artifact = new AutomateWorkspaceArtifact(udi, new ArtifactDependencyCollection())
         {
             Alias = "marketing",
             Name = "Marketing",
             ServiceAccountKey = Guid.NewGuid(),
         };
+#pragma warning restore CS0618
         var state = ArtifactDeployState.Create<AutomateWorkspaceArtifact, Workspace>(artifact, null, _connector, 3);
         _workspaceServiceMock
             .Setup(x => x.CreateWorkspaceAsync(It.IsAny<Workspace>(), It.IsAny<Guid?>(), It.IsAny<CancellationToken>()))
