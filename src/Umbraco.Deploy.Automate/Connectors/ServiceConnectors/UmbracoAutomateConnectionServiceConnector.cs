@@ -7,6 +7,8 @@ using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Deploy;
 using Umbraco.Deploy.Automate.Artifacts;
 using Umbraco.Deploy.Automate.Configuration;
+using Umbraco.Cms.Core.Models;
+using Umbraco.Deploy.Core.Connectors.ServiceConnectors;
 
 namespace Umbraco.Deploy.Automate.Connectors.ServiceConnectors;
 
@@ -282,4 +284,30 @@ public class UmbracoAutomateConnectionServiceConnector(
                field.PropertyName,
                DeployAutomateConstants.EnvironmentSpecificConnectionSettings.OAuthCredentialsIdPropertyName,
                StringComparison.OrdinalIgnoreCase);
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// A flat list of connections at the root.
+    /// </remarks>
+    protected override async Task<PagedModel<TreeItem>> GetTreeLevelAsync(
+        GuidUdi? parentUdi,
+        string? filter,
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        if (parentUdi is not null)
+        {
+            return new PagedModel<TreeItem>();
+        }
+
+        var connections = await connectionService.GetAllConnectionsAsync(cancellationToken);
+        var items = connections
+            .Where(x => UmbracoAutomateTreeItems.Matches(x.Name, filter))
+            .OrderBy(x => x.Name)
+            .Select(x => UmbracoAutomateTreeItems.ForConnection(x, null))
+            .ToList();
+
+        return UmbracoAutomateTreeItems.Page(items, skip, take);
+    }
 }

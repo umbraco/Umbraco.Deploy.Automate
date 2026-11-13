@@ -14,6 +14,6 @@ Example: notify a channel when a deployment fails, or log every imported documen
 ### Requirements
 
 - Umbraco CMS 17.x
-- Umbraco Deploy 17.x
+- Umbraco Deploy 17.4+
 - Umbraco.Automate 17.0+
 - .NET 10.0

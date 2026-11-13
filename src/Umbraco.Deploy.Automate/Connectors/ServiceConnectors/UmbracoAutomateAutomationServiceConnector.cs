@@ -10,6 +10,8 @@ using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Deploy;
 using Umbraco.Deploy.Automate.Artifacts;
 using Umbraco.Deploy.Automate.Configuration;
+using Umbraco.Cms.Core.Models;
+using Umbraco.Deploy.Core.Connectors.ServiceConnectors;
 
 namespace Umbraco.Deploy.Automate.Connectors.ServiceConnectors;
 
@@ -250,5 +252,55 @@ public class UmbracoAutomateAutomationServiceConnector(
 
             state.Entity = await automationService.CreateAutomationAsync(automation, cancellationToken: cancellationToken);
         }
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The root of the Automations tree lists workspaces, each with children. Below it Deploy asks the workspace and
+    /// group connectors, so an automation has no children. A filter searches workspaces and automations by name;
+    /// groups are not searched because this connector has no group service.
+    /// </remarks>
+    protected override async Task<PagedModel<TreeItem>> GetTreeLevelAsync(
+        GuidUdi? parentUdi,
+        string? filter,
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        if (parentUdi is not null)
+        {
+            return new PagedModel<TreeItem>();
+        }
+
+        var hasFilter = !string.IsNullOrWhiteSpace(filter);
+        var workspaces = await workspaceService.GetAllWorkspacesAsync(cancellationToken);
+        var head = workspaces
+            .Where(x => UmbracoAutomateTreeItems.Matches(x.Name, filter))
+            .OrderBy(x => x.Name)
+            .Select(x => UmbracoAutomateTreeItems.ForWorkspace(x, true, null))
+            .ToList();
+
+        return await UmbracoAutomateTreeItems.PageWithTailAsync(
+            head,
+            async (tailSkip, tailTake, ct) =>
+            {
+                if (hasFilter is false)
+                {
+                    return (Array.Empty<TreeItem>(), 0);
+                }
+
+                var (automations, total) = await automationService.GetAutomationsPagedAsync(
+                    filter: filter,
+                    workspaceIds: null,
+                    groupId: null,
+                    skip: tailSkip,
+                    take: tailTake,
+                    cancellationToken: ct);
+
+                return (automations.Select(x => UmbracoAutomateTreeItems.ForAutomation(x, null)).ToList(), total);
+            },
+            skip,
+            take,
+            cancellationToken);
     }
 }
