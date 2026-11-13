@@ -1,8 +1,11 @@
+using System.Reflection;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Umbraco.Automate.Core.Actions;
 using Umbraco.Automate.Testing;
 using Umbraco.Cms.Core;
+using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Deploy;
 using Umbraco.Cms.Core.Hosting;
 using Umbraco.Deploy.Automate.Actions;
@@ -79,6 +82,41 @@ public class DeployEnvironmentActionTests
 
         source!.Uri.ToString().ShouldBe("https://live.example.com" + DeployAutomateConstants.EnvironmentApi.RootPath);
     }
+
+    // Obsolete overload kept for the 8-parameter constructor shipped in 18.1.0: it resolves the
+    // entity types options from the static service provider and keeps the workspaces it was given.
+#pragma warning disable CS0618
+    [Fact]
+    public void DeployContent_ObsoleteConstructorWithWorkspaces_UsesTheGivenWorkspacesAndResolvedOptions()
+    {
+        IOptionsMonitor<DeployEntityTypesOptions> monitor = Monitor(_entityTypes);
+        var services = new ServiceCollection().AddSingleton(monitor).BuildServiceProvider();
+        IServiceProvider? previous = StaticServiceProvider.Instance;
+        StaticServiceProvider.Instance = services;
+        try
+        {
+            var action = new DeployContentAction(
+                null!,
+                CreateCurrentEnvironment(),
+                _workItemFactory.Object,
+                new ConfigurationEnvironmentInfoExtractor(_workspaces.Object),
+                _hostingEnvironment.Object,
+                CreateFileTypes(),
+                Options.Create(new DeploySettings()),
+                _workspaces.Object);
+
+            ReadField<IWorkspaces>(action, "_workspaces").ShouldBeSameAs(_workspaces.Object);
+            ReadField<IOptionsMonitor<DeployEntityTypesOptions>>(action, "_deployEntityTypesOptions").ShouldBeSameAs(monitor);
+        }
+        finally
+        {
+            StaticServiceProvider.Instance = previous!;
+        }
+    }
+#pragma warning restore CS0618
+
+    private static T ReadField<T>(object instance, string name)
+        => (T)instance.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(instance)!;
 
     private async Task<ActionResult> ExecuteDeployContentAsync(string targetUrl)
         => await ActionTestHarness.For<DeployContentAction>()

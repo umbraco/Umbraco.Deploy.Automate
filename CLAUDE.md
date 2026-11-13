@@ -24,7 +24,7 @@ src/Umbraco.Deploy.Automate/
   Artifacts/                        # DeployArtifactBase<GuidUdi> subtypes (on-disk/serialized shape)
   Configuration/                    # DeployAutomateSettings (Umbraco:Deploy:Automate config section)
   Connectors/ServiceConnectors/     # One IServiceConnector (and ITreeServiceConnector) per Automate entity type
-  Extensions/                       # UdiExtensions (internal)
+  Extensions/                       # UdiExtensions, DeployEntityTypesOptionsExtensions, WorkspacesExtensions (all internal)
   NotificationHandlers/             # Automate Saved/Deleted -> Deploy disk-refresher handlers
   Triggers/                         # [Trigger] classes wrapping Deploy notifications
   Triggers/Outputs/                 # POCO output shapes exposed to automation flows
@@ -86,7 +86,7 @@ Forgetting this flag when the sibling checkout isn't present is harmless (the `E
 dotnet test Umbraco.Deploy.Automate.slnx --configuration Release
 ```
 
-162 unit tests (the most of any Automate satellite) — `xunit` + `Shouldly` + `Moq`, no integration test project. CI runs this on Windows, Linux, and macOS in a matrix for `main`, `release/*` and `hotfix/*` builds (Linux only for PRs and feature branches; the shared Umbraco.Build template's Test stage).
+165 unit tests (the most of any Automate satellite) — `xunit` + `Shouldly` + `Moq`, no integration test project. CI runs this on Windows, Linux, and macOS in a matrix for `main`, `release/*` and `hotfix/*` builds (Linux only for PRs and feature branches; the shared Umbraco.Build template's Test stage).
 
 ### Pack
 
@@ -98,7 +98,7 @@ Packing regenerates `src/Umbraco.Deploy.Automate/appsettings-schema.Umbraco.Depl
 
 ### Versioning
 
-Version comes from Nerdbank.GitVersioning (`version.json`), not the csproj. Current baseline: `19.0.0-rc1` on `v19/dev` (`18.0.1` on `main`). `publicReleaseRefSpec` only treats `main`, `hotfix/*`, and `release/*` as public releases — builds from any other branch (`v19/dev`, feature branches, `dev`, PR builds) get a non-release semver with a git-height suffix. On `v19/dev` that packs as `19.0.0--rc1.preview.<height>.g<sha>` (format from Umbraco.GitVersioning.Extensions; read `PackageVersion`, not NBGV's `NuGetPackageVersion`), which sorts below every shipped `-rcN`. A `release/*` build packs the bare `version.json` version (`19.0.0-rc1`).
+Version comes from Nerdbank.GitVersioning (`version.json`), not the csproj. Current baseline: `19.0.0-rc1` on `v19/dev` (`main` has its own, see `version.json` there). `publicReleaseRefSpec` only treats `main`, `hotfix/*`, and `release/*` as public releases — builds from any other branch (`v19/dev`, feature branches, `dev`, PR builds) get a non-release semver with a git-height suffix. On `v19/dev` that packs as `19.0.0--rc1.preview.<height>.g<sha>` (format from Umbraco.GitVersioning.Extensions; read `PackageVersion`, not NBGV's `NuGetPackageVersion`), which sorts below every shipped `-rcN`. A `release/*` build packs the bare `version.json` version (`19.0.0-rc1`).
 
 ### Environment setup
 
@@ -145,7 +145,7 @@ Deploy import/restore failures use **fail-fast validation with a message naming 
 
 ### Branch model
 
-- `main` = current CMS major line (**v18**, `version.json` → `18.0.1`).
+- `main` = current CMS major line (**v18**, version in `version.json` on that branch).
 - `v19/dev` = the **v19** line while CMS 19 is in pre-release (`version.json` → `19.0.0-rc1`). Long-lived like `main` and `support/17.x`: pushes to it build but never publish. Each pre-release (`19.0.0-rc1`, `-rc2`, ...) is cut from `v19/dev` as `release/YYYY.MM.N`, published from that branch to MyGet and NuGet.org, then merged back into `v19/dev`. When CMS 19, Automate 19 and Deploy 19 are all stable the package drops the `-rc` label and releases as `19.0.0`. At v19 GA, `main` is expected to become the v19 line (not decided yet).
 - `support/17.x` = previous CMS major line (**v17**), checked out as a persistent git worktree at `.claude/worktrees/support-17.x` in this local clone — use that worktree for v17 work rather than switching branches in the primary checkout.
 - `dev` exists as a branch but is not part of the documented release flow described below; treat `main`, `v19/dev` and `support/17.x` as the live lines.
@@ -209,5 +209,5 @@ Do not attempt to shortcut this by publishing from a feature branch or skipping 
 - **Known limitation: only 3 of the 3 "have" actions exist; 5 more are speculative.** README's "Future work" table lists Export Artifact, Import Artifact, Restore from Disk, Validate Schema, Queue Deploy Task as *not yet implemented* — don't assume they exist or start implementing them without confirming the request, since they're explicitly aspirational.
 - **Config schema is generated, not hand-maintained.** `src/Umbraco.Deploy.Automate/appsettings-schema.Umbraco.Deploy.Automate.json` is regenerated on every build from `DeployAutomateSchema.cs` (a marker type) via the `Umbraco.JsonSchema.Extensions` package (`Umbraco.Deploy.Automate.csproj:46-60`, pinned via `PackageVersion Update` at the bottom of the same file — note it's set twice, once centrally in `Directory.Packages.props:10` and once locally overriding in the csproj itself at lines 108-116, which is intentional: the csproj pin exists so `PrivateAssets`/`IncludeAssets` can be attached to that specific reference). Never hand-edit the generated JSON file; change `DeployAutomateSettings.cs`/`DeployAutomateSchema.cs` instead.
 - **History**: this package used to be `Umbraco.Automate.Deploy`, living inside the `Umbraco.Automate` monorepo. It was extracted into its own repo so the whole Deploy⇄Automate integration (both directions: Automate-entities-through-Deploy AND Deploy-events-into-Automate) ships as a single installable package rather than being split across two repos.
-- **This repo has 162 unit tests — the most of any Automate satellite** — but coverage is uneven: `Connectors/ServiceConnectors/`, `Triggers/`, `Workspaces/` and `NotificationHandlers/` are covered, `Actions/` only partly, and `Artifacts/` not at all. Weigh this when assessing risk of a change in those folders.
+- **This repo has 165 unit tests — the most of any Automate satellite** — but coverage is uneven: `Connectors/ServiceConnectors/`, `Triggers/`, `Workspaces/` and `NotificationHandlers/` are covered, `Actions/` only partly, and `Artifacts/` not at all. Weigh this when assessing risk of a change in those folders.
 - **No secrets, no auth code, no SQL in this package** — it's a domain-translation adapter over two other products' SDKs. The only "security-adjacent" logic is the sensitive-settings stripping described above, which is about *not leaking connection secrets into deploy artifacts written to disk/source control*, not authentication/authorization.

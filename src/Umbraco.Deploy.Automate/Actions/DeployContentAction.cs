@@ -83,6 +83,29 @@ public sealed class DeployContentAction : ActionBase<DeployContentSettings, Depl
     {
     }
 
+    [Obsolete("Use the constructor taking IOptionsMonitor<DeployEntityTypesOptions>. Will be removed in v21.0.0.")]
+    public DeployContentAction(
+        ActionInfrastructure infrastructure,
+        CurrentEnvironment currentEnvironment,
+        IWorkItemFactory workItemFactory,
+        IExtractEnvironmentInfo environmentInfoExtractor,
+        IHostingEnvironment hostingEnvironment,
+        IFileTypeCollection fileTypeCollection,
+        IOptions<DeploySettings> deploySettings,
+        IWorkspaces workspaces)
+        : this(
+            infrastructure,
+            currentEnvironment,
+            workItemFactory,
+            environmentInfoExtractor,
+            hostingEnvironment,
+            fileTypeCollection,
+            deploySettings,
+            StaticServiceProvider.Instance.GetRequiredService<IOptionsMonitor<DeployEntityTypesOptions>>(),
+            workspaces)
+    {
+    }
+
     public override Task<ActionResult> ExecuteAsync(ActionContext context, CancellationToken cancellationToken)
     {
         var settings = context.GetSettings<DeployContentSettings>();
