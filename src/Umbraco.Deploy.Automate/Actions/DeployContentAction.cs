@@ -5,6 +5,8 @@ using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.DependencyInjection;
 using Umbraco.Cms.Core.Deploy;
 using Umbraco.Cms.Core.Hosting;
+using Umbraco.Deploy.Automate.Extensions;
+using Umbraco.Deploy.Core.Configuration;
 using Umbraco.Deploy.Core.Configuration.DeployConfiguration;
 using Umbraco.Deploy.Core.Environments;
 using Umbraco.Deploy.Core.Exceptions;
@@ -34,6 +36,7 @@ public sealed class DeployContentAction : ActionBase<DeployContentSettings, Depl
     private readonly IFileTypeCollection _fileTypeCollection;
     private readonly DeploySettings _deploySettings;
     private readonly IOptionsMonitor<DeployEntityTypesOptions> _deployEntityTypesOptions;
+    private readonly IWorkspaces _workspaces;
 
     [ActivatorUtilitiesConstructor]
     public DeployContentAction(
@@ -44,10 +47,12 @@ public sealed class DeployContentAction : ActionBase<DeployContentSettings, Depl
         IHostingEnvironment hostingEnvironment,
         IFileTypeCollection fileTypeCollection,
         IOptions<DeploySettings> deploySettings,
-        IOptionsMonitor<DeployEntityTypesOptions> deployEntityTypesOptions)
+        IOptionsMonitor<DeployEntityTypesOptions> deployEntityTypesOptions,
+        IWorkspaces workspaces)
         : base(infrastructure)
     {
         _deployEntityTypesOptions = deployEntityTypesOptions;
+        _workspaces = workspaces;
         _currentEnvironment = currentEnvironment;
         _workItemFactory = workItemFactory;
         _environmentInfoExtractor = environmentInfoExtractor;
@@ -56,7 +61,7 @@ public sealed class DeployContentAction : ActionBase<DeployContentSettings, Depl
         _deploySettings = deploySettings.Value;
     }
 
-    [Obsolete("Use the constructor taking IOptionsMonitor<DeployEntityTypesOptions>. Will be removed in v21.0.0.")]
+    [Obsolete("Use the constructor taking IOptionsMonitor<DeployEntityTypesOptions> and IWorkspaces. Will be removed in v21.0.0.")]
     public DeployContentAction(
         ActionInfrastructure infrastructure,
         CurrentEnvironment currentEnvironment,
@@ -73,7 +78,8 @@ public sealed class DeployContentAction : ActionBase<DeployContentSettings, Depl
             hostingEnvironment,
             fileTypeCollection,
             deploySettings,
-            StaticServiceProvider.Instance.GetRequiredService<IOptionsMonitor<DeployEntityTypesOptions>>())
+            StaticServiceProvider.Instance.GetRequiredService<IOptionsMonitor<DeployEntityTypesOptions>>(),
+            StaticServiceProvider.Instance.GetRequiredService<IWorkspaces>())
     {
     }
 
@@ -129,6 +135,14 @@ public sealed class DeployContentAction : ActionBase<DeployContentSettings, Depl
         {
             return Task.FromResult(ActionResult.Failed(
                 new InvalidOperationException($"Could not resolve target environment from '{settings.TargetUrl}'. Verify it is a configured Deploy environment."),
+                StepRunErrorCategory.Validation));
+        }
+
+        // The Baseline workspace can only be restored from, so Deploy rejects it as a target too
+        if (_workspaces.IsBaseline(targetEnvironment))
+        {
+            return Task.FromResult(ActionResult.Failed(
+                new InvalidOperationException($"'{settings.TargetUrl}' is the Baseline workspace, which can only be restored from."),
                 StepRunErrorCategory.Validation));
         }
 

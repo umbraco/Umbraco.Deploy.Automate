@@ -96,7 +96,9 @@ public sealed class TriggerRestoreAction : ActionBase<TriggerRestoreSettings, Tr
                 StepRunErrorCategory.Validation));
         }
 
-        var sourceApiUrl = new Uri(settings.SourceUrl.TrimEnd('/') + DeployAutomateConstants.EnvironmentApi.RootPath);
+        // Point at the environment API of the resolved workspace, which carries the configured scheme,
+        // host and port instead of the URL that was received (like Deploy's own restore does)
+        var sourceApiUrl = new Uri(sourceEnvironment.Uri.ToString().TrimEnd('/') + DeployAutomateConstants.EnvironmentApi.RootPath);
         sourceEnvironment.SetUri(sourceApiUrl);
 
         // Build the restore entity type sets from the registered transfer entity types,

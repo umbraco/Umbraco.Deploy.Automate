@@ -40,13 +40,24 @@ public class DeployAutomateComposerTests
             }.OrderBy(x => x));
     }
 
-    // Deploy throws on the first read of the options when a type is in both sets.
+    // Deploy throws on the first read of the options when this fails, so it runs Deploy's own validator.
     [Fact]
-    public void Compose_DoesNotRegisterAnEntityTypeAsBothDiskAndTransfer()
+    public void Compose_PassesDeploysEntityTypesOptionsValidation()
     {
-        var options = ComposeEntityTypes();
+        ValidateOptionsResult result = CreateDeployValidator().Validate(Options.DefaultName, ComposeEntityTypes());
 
-        options.TransferEntityTypes.Keys.Intersect(options.DiskEntityTypes).ShouldBeEmpty();
+        result.Succeeded.ShouldBeTrue(result.FailureMessage);
+    }
+
+    // Guards the test above: the validator must be able to fail, otherwise it proves nothing.
+    [Fact]
+    public void DeploysEntityTypesOptionsValidation_RejectsAnEntityTypeThatIsBothDiskAndTransfer()
+    {
+        var options = new DeployEntityTypesOptions();
+        options.AddDiskEntityType(DeployAutomateConstants.UdiEntityType.Automation);
+        options.AddTransferEntityType(DeployAutomateConstants.UdiEntityType.Automation, new DeployTransferEntityTypeOptions());
+
+        CreateDeployValidator().Validate(Options.DefaultName, options).Failed.ShouldBeTrue();
     }
 
     [Fact]
@@ -90,6 +101,16 @@ public class DeployAutomateComposerTests
         var definition = connectorType.GetCustomAttribute<UdiDefinitionAttribute>();
 
         (definition?.UdiType, definition?.EntityType).ShouldBe((UdiType.GuidUdi, entityType));
+    }
+
+    // ValidateDeployEntityTypesOptions is internal to Deploy, so it is created by reflection.
+    private static IValidateOptions<DeployEntityTypesOptions> CreateDeployValidator()
+    {
+        Type validatorType = typeof(DeployEntityTypesOptions).Assembly
+            .GetType("Umbraco.Deploy.Infrastructure.Configuration.ValidateDeployEntityTypesOptions")
+            ?? throw new InvalidOperationException("Deploy no longer has ValidateDeployEntityTypesOptions.");
+
+        return (IValidateOptions<DeployEntityTypesOptions>)Activator.CreateInstance(validatorType, nonPublic: true)!;
     }
 
     private static DeployEntityTypesOptions ComposeEntityTypes()
