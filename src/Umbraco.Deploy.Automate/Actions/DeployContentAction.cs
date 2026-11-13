@@ -58,7 +58,7 @@ public sealed class DeployContentAction : ActionBase<DeployContentSettings, Depl
         _deploySettings = deploySettings.Value;
     }
 
-    [Obsolete("Use the constructor taking IWorkspaces. Will be removed in v20.0.0.")]
+    [Obsolete("Use the constructor taking IWorkspaces. Will be removed in v21.0.0.")]
     public DeployContentAction(
         ActionInfrastructure infrastructure,
         CurrentEnvironment currentEnvironment,
