@@ -39,7 +39,7 @@ The package registers Deploy service connectors for the four user-defined Automa
 
 | Entity | UDI entity type | Notes |
 |---|---|---|
-| Workspace | `umbraco-automate-workspace` | Includes service account key, user-group assignments, and allowed-connection list. |
+| Workspace | `umbraco-automate-workspace` | Includes user-group assignments and the allowed-connection list. The service account is environment-specific and isn't transferred. |
 | Workspace Group | `umbraco-automate-workspace-group` | Folder hierarchy; nested groups are reparented in a second pass after every group exists on the target. |
 | Automation | `umbraco-automate-automation` | Full trigger / steps / step-connections / notification-settings graph, including conditions and canvas state. |
 | Connection | `umbraco-automate-connection` | Type alias plus the settings dictionary, with sensitive-value filtering (see below). |
