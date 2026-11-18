@@ -56,6 +56,8 @@ The package registers Deploy service connectors for the four user-defined Automa
 - **Transfer** (automations and workspace groups): use Add to Transfer Queue, Tree restore and Partial restore, like content. These actions are on the Automations tree. Partial restore from the header shows your workspaces. Open one and pick a folder or automation, not the workspace itself. Tree restore is on the Automations header only.
 - **Disk only** (workspaces and connections): saving one writes its `.uda` file; commit it and deploy it with the schema. They have no transfer or restore actions.
 
+With Deploy's `Edition` setting set to `BackOfficeOnly`, Deploy writes no `.uda` files. Workspaces and connections then show Add to Transfer Queue and Export instead.
+
 Deploy the schema (workspaces and connections) before you transfer automations. Otherwise the import fails with "Ensure the workspace is deployed before the automation".
 
 ### Supported entities
